@@ -7,9 +7,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Sarabun', sans-serif; background-color: #f3f4f6; }
-        .video-container { position: relative; background: #000; border-radius: 12px; overflow: hidden; aspect-ratio: 4/3; width: 100%; }
-        #camera { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); } /* Mirror mode for selfie */
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f3f4f6;
+        }
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
@@ -21,147 +22,152 @@
         </div>
 
         <div class="p-6">
-            <!-- Camera Selection -->
-            <div id="cameraSelectDiv" class="mb-3 hidden">
-                <label class="text-xs text-gray-500 mb-1 block">เลือกกล้อง:</label>
-                <select id="cameraSelect" class="w-full text-sm px-3 py-2 border border-gray-300 rounded-lg outline-none bg-gray-50"></select>
-            </div>
-
-            <!-- Video Display -->
-            <div class="video-container mb-4 flex items-center justify-center">
-                <video id="camera" autoplay playsinline></video>
-                <div id="loadingSign" class="absolute text-white text-xs text-center flex flex-col items-center">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2"></div>
-                    <p>กำลังเตรียมกล้อง...</p>
+            <!-- Camera View -->
+            <div class="relative bg-black rounded-lg overflow-hidden mb-4 aspect-video flex items-center justify-center">
+                <video id="camera" class="w-full h-full object-cover" autoplay playsinline></video>
+                <div id="cameraError" class="absolute inset-0 flex items-center justify-center text-white text-center p-4 hidden bg-gray-800">
+                    <p class="text-sm">ไม่สามารถเปิดกล้องได้<br>กรุณาอนุญาตการเข้าถึงกล้อง</p>
                 </div>
             </div>
 
+            <!-- Canvas for capturing image (Hidden) -->
             <canvas id="snapshot" class="hidden"></canvas>
 
+            <!-- Input Form -->
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อ-นามสกุล พนักงาน</label>
-                <input type="text" id="employeeName" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="ใส่ชื่อพนักงาน">
+                <label for="employeeName" class="block text-sm font-medium text-gray-700 mb-1">รหัสพนักงาน / ชื่อ-นามสกุล</label>
+                <input type="text" id="employeeName" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="ระบุชื่อหรือรหัสพนักงาน">
             </div>
 
+            <!-- Action Buttons -->
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="submitData('เข้างาน')" id="btnIn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg shadow-md active:transform active:scale-95 transition disabled:opacity-50">เข้างาน</button>
-                <button onclick="submitData('ออกงาน')" id="btnOut" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg shadow-md active:transform active:scale-95 transition disabled:opacity-50">ออกงาน</button>
+                <button onclick="submitData('เข้างาน')" id="btnIn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow transition flex items-center justify-center disabled:opacity-50">
+                    <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
+                    เข้างาน (In)
+                </button>
+                <button onclick="submitData('ออกงาน')" id="btnOut" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg shadow transition flex items-center justify-center disabled:opacity-50">
+                    <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    ออกงาน (Out)
+                </button>
             </div>
 
-            <div id="statusMessage" class="mt-4 text-center text-sm font-medium min-h-[24px] p-2 rounded"></div>
+            <!-- Status Message -->
+            <div id="statusMessage" class="mt-4 text-center text-sm font-medium h-6"></div>
         </div>
     </div>
 
     <script>
-        // ลิงก์ที่ใช้ Deploy ล่าสุดของคุณ
+        // ลิงก์ Google Apps Script ของคุณ
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz_ntLPIAnvJlu_FmpluqwYIrhw3c2xX7Nr13_-fHBsDVYAKDzkkh9VZeV5zIdED5n7/exec';
 
         const video = document.getElementById('camera');
-        const loadingSign = document.getElementById('loadingSign');
-        const cameraSelect = document.getElementById('cameraSelect');
-        const cameraSelectDiv = document.getElementById('cameraSelectDiv');
-        let currentStream = null;
+        const canvas = document.getElementById('snapshot');
+        const cameraError = document.getElementById('cameraError');
+        const statusMessage = document.getElementById('statusMessage');
+        const btnIn = document.getElementById('btnIn');
+        const btnOut = document.getElementById('btnOut');
 
-        // เริ่มต้นขอสิทธิ์การใช้งานกล้อง
-        async function startApp() {
+        // ฟังก์ชันเปิดกล้อง
+        async function startCamera() {
             try {
-                // ขั้นแรกต้องขอสิทธิ์ให้ผ่านก่อน
-                const initialStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                initialStream.getTracks().forEach(track => track.stop());
+                // ขออนุญาตใช้กล้อง
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                video.srcObject = stream;
+                cameraError.classList.add('hidden');
+            } catch (err) {
+                console.error("Error accessing camera: ", err);
+                video.classList.add('hidden');
+                cameraError.classList.remove('hidden');
                 
-                // ดึงรายชื่ออุปกรณ์
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(d => d.kind === 'videoinput');
-
-                if (videoDevices.length > 0) {
-                    cameraSelectDiv.classList.remove('hidden');
-                    cameraSelect.innerHTML = '';
-                    videoDevices.forEach(device => {
-                        const opt = document.createElement('option');
-                        opt.value = device.deviceId;
-                        opt.text = device.label || `Camera ${cameraSelect.length + 1}`;
-                        cameraSelect.appendChild(opt);
-                    });
-                    
-                    cameraSelect.onchange = () => openCamera(cameraSelect.value);
-                    await openCamera(videoDevices[0].deviceId);
+                // แจ้งเตือนเรื่อง Security ข้อจำกัดของไฟล์ Local
+                if(window.location.protocol === 'file:') {
+                    cameraError.innerHTML = '<p class="text-sm text-red-400">เบราว์เซอร์ไม่อนุญาตให้เปิดกล้องจากไฟล์ที่บันทึกบนเครื่อง (file://)<br>โปรดอ่านคำแนะนำเพิ่มเติม</p>';
                 }
-            } catch (err) {
-                console.error("Camera access denied:", err);
-                loadingSign.innerHTML = '<p class="text-red-500 font-bold">ไม่สามารถเข้าถึงกล้องได้<br><span class="text-[10px] font-normal">โปรดอนุญาตให้เข้าถึงกล้องใน Browser</span></p>';
             }
         }
 
-        async function openCamera(id) {
-            if (currentStream) {
-                currentStream.getTracks().forEach(t => t.stop());
-            }
-            try {
-                currentStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { deviceId: id ? { exact: id } : undefined } 
-                });
-                video.srcObject = currentStream;
-                loadingSign.classList.add('hidden');
-            } catch (err) {
-                console.error("Error switching camera:", err);
-            }
-        }
+        // เริ่มเปิดกล้องทันทีที่โหลดหน้าเว็บ
+        window.onload = startCamera;
 
+        // ฟังก์ชันส่งข้อมูล
         async function submitData(type) {
-            const name = document.getElementById('employeeName').value.trim();
-            if (!name) {
-                showStatus('❌ กรุณาใส่ชื่อพนักงาน', 'text-red-600 bg-red-50');
+            const employeeName = document.getElementById('employeeName').value.trim();
+            
+            if (!employeeName) {
+                showMessage('กรุณาระบุชื่อหรือรหัสพนักงาน!', 'text-red-500');
                 return;
             }
 
-            const btnIn = document.getElementById('btnIn');
-            const btnOut = document.getElementById('btnOut');
-            
-            btnIn.disabled = btnOut.disabled = true;
-            showStatus('⌛ กำลังส่งข้อมูลไปยัง Google Sheets...', 'text-blue-600 bg-blue-50');
+            if (!video.srcObject) {
+                showMessage('ไม่พบกล้องถ่ายรูป กรุณาอนุญาตการใช้งานกล้อง', 'text-red-500');
+                return;
+            }
+
+            // ล็อกปุ่มป้องกันการกดซ้ำ
+            btnIn.disabled = true;
+            btnOut.disabled = true;
+            showMessage('กำลังบันทึกข้อมูลและส่งรูปภาพ...', 'text-blue-500');
 
             try {
-                const canvas = document.getElementById('snapshot');
-                canvas.width = 640;
-                canvas.height = 480;
-                const ctx = canvas.getContext('2d');
+                // 1. ถ่ายรูปจาก Video ลง Canvas
+                const context = canvas.getContext('2d');
+                // กำหนดขนาดรูปภาพที่ต้องการส่ง (ย่อขนาดลงเพื่อไม่ให้ไฟล์ใหญ่เกินไป)
+                canvas.width = 320; 
+                canvas.height = 240;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                // ถ่ายรูป (จัดการเรื่อง Mirror mode ในรูปถ่ายด้วย)
-                ctx.translate(canvas.width, 0);
-                ctx.scale(-1, 1);
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                const base64 = canvas.toDataURL('image/jpeg', 0.7);
+                // 2. แปลงรูปเป็น Base64 String
+                const imageBase64 = canvas.toDataURL('image/jpeg', 0.7); // ลดคุณภาพเหลือ 70% เพื่อลดขนาด
 
-                // ส่งแบบ POST โดยใช้ fetch
-                // หมายเหตุ: mode: 'no-cors' จะส่งข้อมูลได้ แต่เราจะอ่าน Response จาก Google ไม่ได้
-                // ข้อมูลจะเข้า Google Sheet แต่ status จะเป็น 0 (สำเร็จแบบเงียบๆ)
-                await fetch(SCRIPT_URL, {
+                // 3. สร้างข้อมูลที่จะส่ง
+                const payload = {
+                    name: employeeName,
+                    type: type,
+                    timestamp: new Date().toLocaleString('th-TH'),
+                    image: imageBase64
+                };
+
+                // 4. ส่งข้อมูลไปที่ Google Apps Script
+                const response = await fetch(SCRIPT_URL, {
                     method: 'POST',
-                    mode: 'no-cors',
-                    cache: 'no-cache',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: name, type: type, image: base64 })
+                    // ใช้ text/plain เพื่อหลีกเลี่ยงปัญหา CORS Preflight ของ Browser
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8',
+                    },
+                    body: JSON.stringify(payload)
                 });
 
-                showStatus(`✅ บันทึก ${type} สำเร็จแล้ว!`, 'text-green-600 bg-green-50');
-                document.getElementById('employeeName').value = "";
-                
-            } catch (e) {
-                console.error("Submit error:", e);
-                showStatus("❌ ส่งข้อมูลล้มเหลว", "text-red-600 bg-red-50");
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showMessage(`✅ บันทึกเวลา${type} สำเร็จ! (${payload.timestamp})`, 'text-green-600');
+                    document.getElementById('employeeName').value = ''; // ล้างช่องชื่อ
+                } else {
+                    showMessage(`❌ เกิดข้อผิดพลาด: ${result.message || 'ไม่สามารถบันทึกได้'}`, 'text-red-500');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('❌ การส่งข้อมูลล้มเหลว ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต', 'text-red-500');
             } finally {
-                btnIn.disabled = btnOut.disabled = false;
+                // ปลดล็อกปุ่ม
+                btnIn.disabled = false;
+                btnOut.disabled = false;
             }
         }
 
-        function showStatus(msg, classes) {
-            const status = document.getElementById('statusMessage');
-            status.innerText = msg;
-            status.className = `mt-4 text-center text-sm font-medium min-h-[24px] p-2 rounded ${classes}`;
+        // ฟังก์ชันแสดงข้อความสถานะ
+        function showMessage(msg, colorClass) {
+            statusMessage.className = `mt-4 text-center text-sm font-medium h-6 transition-all ${colorClass}`;
+            statusMessage.textContent = msg;
+            
+            // ลบข้อความทิ้งหลังผ่านไป 5 วินาที
+            if(colorClass.includes('green') || colorClass.includes('red')) {
+                setTimeout(() => {
+                    statusMessage.textContent = '';
+                }, 5000);
+            }
         }
-
-        window.onload = startApp;
     </script>
 </body>
 </html>
