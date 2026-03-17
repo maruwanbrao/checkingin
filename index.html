@@ -22,11 +22,19 @@
         </div>
 
         <div class="p-6">
+            
+            <!-- เมนูเลือกกล้อง (เพิ่มใหม่) -->
+            <div class="mb-3">
+                <select id="cameraSelect" class="w-full text-sm px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 hidden bg-gray-50">
+                    <option value="">กำลังค้นหากล้อง...</option>
+                </select>
+            </div>
+
             <!-- Camera View -->
             <div class="relative bg-black rounded-lg overflow-hidden mb-4 aspect-video flex items-center justify-center">
                 <video id="camera" class="w-full h-full object-cover" autoplay playsinline></video>
                 <div id="cameraError" class="absolute inset-0 flex items-center justify-center text-white text-center p-4 hidden bg-gray-800">
-                    <p class="text-sm">ไม่สามารถเปิดกล้องได้<br>กรุณาอนุญาตการเข้าถึงกล้อง</p>
+                    <p class="text-sm" id="cameraErrorText">กำลังเชื่อมต่อกล้อง...</p>
                 </div>
             </div>
 
@@ -41,12 +49,12 @@
 
             <!-- Action Buttons -->
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="submitData('เข้างาน')" id="btnIn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow transition flex items-center justify-center disabled:opacity-50">
-                    <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
+                <button onclick="submitData('เข้างาน')" id="btnIn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow transition flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
                     เข้างาน (In)
                 </button>
-                <button onclick="submitData('ออกงาน')" id="btnOut" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg shadow transition flex items-center justify-center disabled:opacity-50">
-                    <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                <button onclick="submitData('ออกงาน')" id="btnOut" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg shadow transition flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                     ออกงาน (Out)
                 </button>
             </div>
@@ -57,37 +65,91 @@
     </div>
 
     <script>
-        // ลิงก์ Google Apps Script ของคุณ
+        // *** อย่าลืมตรวจสอบ URL นี้ว่ามาจากการ Deploy แบบ "ทุกคน (Anyone)" ***
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwKP3I6-KL8zZul552aOPRdPft_Der4yQH5fnlER2lPUtLv12WIgLSaqufoqMdooYxW/exec';
 
         const video = document.getElementById('camera');
         const canvas = document.getElementById('snapshot');
         const cameraError = document.getElementById('cameraError');
+        const cameraErrorText = document.getElementById('cameraErrorText');
         const statusMessage = document.getElementById('statusMessage');
         const btnIn = document.getElementById('btnIn');
         const btnOut = document.getElementById('btnOut');
+        const cameraSelect = document.getElementById('cameraSelect');
+        
+        let currentStream = null;
 
-        // ฟังก์ชันเปิดกล้อง
-        async function startCamera() {
+        // ฟังก์ชันเริ่มต้น: ค้นหากล้องทั้งหมดในเครื่อง
+        async function initCameras() {
             try {
-                // ขออนุญาตใช้กล้อง
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                video.srcObject = stream;
-                cameraError.classList.add('hidden');
-            } catch (err) {
-                console.error("Error accessing camera: ", err);
-                video.classList.add('hidden');
-                cameraError.classList.remove('hidden');
+                // ขออนุญาตใช้กล้องเบื้องต้น เพื่อให้ดึงรายชื่อกล้องได้
+                const initialStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 
-                // แจ้งเตือนเรื่อง Security ข้อจำกัดของไฟล์ Local
-                if(window.location.protocol === 'file:') {
-                    cameraError.innerHTML = '<p class="text-sm text-red-400">เบราว์เซอร์ไม่อนุญาตให้เปิดกล้องจากไฟล์ที่บันทึกบนเครื่อง (file://)<br>โปรดอ่านคำแนะนำเพิ่มเติม</p>';
+                // ดึงรายการอุปกรณ์ทั้งหมด
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+                cameraSelect.innerHTML = '';
+                
+                if (videoDevices.length > 0) {
+                    cameraSelect.classList.remove('hidden');
+                    
+                    // เพิ่มตัวเลือกกล้องลงใน Dropdown
+                    videoDevices.forEach((device, index) => {
+                        const option = document.createElement('option');
+                        option.value = device.deviceId;
+                        option.text = device.label || `กล้องตัวที่ ${index + 1}`;
+                        cameraSelect.appendChild(option);
+                    });
+
+                    // หยุดการใช้ stream ตัวแรกที่ขอก่อน
+                    initialStream.getTracks().forEach(track => track.stop());
+
+                    // เริ่มเปิดกล้องตามที่เลือกไว้เป็นอันดับแรก
+                    startCamera(cameraSelect.value);
+
+                    // เมื่อผู้ใช้เลือกเปลี่ยนกล้อง
+                    cameraSelect.addEventListener('change', () => {
+                        startCamera(cameraSelect.value);
+                    });
+
+                } else {
+                    showCameraError('ไม่พบอุปกรณ์กล้องบนเครื่องนี้');
                 }
+            } catch (err) {
+                console.error("Init camera error: ", err);
+                showCameraError('กรุณากด "Allow" (อนุญาต) ให้เว็บไซต์เข้าถึงกล้อง');
             }
         }
 
-        // เริ่มเปิดกล้องทันทีที่โหลดหน้าเว็บ
-        window.onload = startCamera;
+        // ฟังก์ชันเปิดกล้องตาม ID ที่เลือก
+        async function startCamera(deviceId) {
+            // ปิดกล้องเก่าก่อน (ถ้ามี)
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+
+            try {
+                currentStream = await navigator.mediaDevices.getUserMedia({
+                    video: { deviceId: deviceId ? { exact: deviceId } : undefined }
+                });
+                video.srcObject = currentStream;
+                cameraError.classList.add('hidden');
+                video.classList.remove('hidden');
+            } catch (err) {
+                console.error("Start camera error: ", err);
+                showCameraError('ไม่สามารถแสดงภาพจากกล้องที่เลือกได้');
+            }
+        }
+
+        function showCameraError(msg) {
+            video.classList.add('hidden');
+            cameraError.classList.remove('hidden');
+            cameraErrorText.innerHTML = msg;
+        }
+
+        // เริ่มทำงานเมื่อโหลดหน้าเว็บ
+        window.onload = initCameras;
 
         // ฟังก์ชันส่งข้อมูล
         async function submitData(type) {
@@ -98,28 +160,26 @@
                 return;
             }
 
-            if (!video.srcObject) {
-                showMessage('ไม่พบกล้องถ่ายรูป กรุณาอนุญาตการใช้งานกล้อง', 'text-red-500');
+            // เช็คว่ามีภาพวิดีโอเล่นอยู่จริงๆ ไหม
+            if (!video.srcObject || !video.srcObject.active) {
+                showMessage('กล้องยังไม่พร้อมใช้งาน กรุณาตรวจสอบกล้อง', 'text-red-500');
                 return;
             }
 
-            // ล็อกปุ่มป้องกันการกดซ้ำ
+            // ล็อกปุ่ม
             btnIn.disabled = true;
             btnOut.disabled = true;
             showMessage('กำลังบันทึกข้อมูลและส่งรูปภาพ...', 'text-blue-500');
 
             try {
-                // 1. ถ่ายรูปจาก Video ลง Canvas
+                // ถ่ายรูป
                 const context = canvas.getContext('2d');
-                // กำหนดขนาดรูปภาพที่ต้องการส่ง (ย่อขนาดลงเพื่อไม่ให้ไฟล์ใหญ่เกินไป)
                 canvas.width = 320; 
                 canvas.height = 240;
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                // 2. แปลงรูปเป็น Base64 String
-                const imageBase64 = canvas.toDataURL('image/jpeg', 0.7); // ลดคุณภาพเหลือ 70% เพื่อลดขนาด
+                const imageBase64 = canvas.toDataURL('image/jpeg', 0.7); 
 
-                // 3. สร้างข้อมูลที่จะส่ง
+                // สร้างข้อมูล
                 const payload = {
                     name: employeeName,
                     type: type,
@@ -127,10 +187,9 @@
                     image: imageBase64
                 };
 
-                // 4. ส่งข้อมูลไปที่ Google Apps Script
+                // ส่งข้อมูล
                 const response = await fetch(SCRIPT_URL, {
                     method: 'POST',
-                    // ใช้ text/plain เพื่อหลีกเลี่ยงปัญหา CORS Preflight ของ Browser
                     headers: {
                         'Content-Type': 'text/plain;charset=utf-8',
                     },
@@ -140,15 +199,16 @@
                 const result = await response.json();
 
                 if (result.status === 'success') {
-                    showMessage(`✅ บันทึกเวลา${type} สำเร็จ! (${payload.timestamp})`, 'text-green-600');
-                    document.getElementById('employeeName').value = ''; // ล้างช่องชื่อ
+                    showMessage(`✅ บันทึกเวลา${type} สำเร็จ!`, 'text-green-600');
+                    document.getElementById('employeeName').value = '';
                 } else {
-                    showMessage(`❌ เกิดข้อผิดพลาด: ${result.message || 'ไม่สามารถบันทึกได้'}`, 'text-red-500');
+                    showMessage(`❌ เกิดข้อผิดพลาดฝั่งเซิร์ฟเวอร์`, 'text-red-500');
                 }
 
             } catch (error) {
-                console.error('Error:', error);
-                showMessage('❌ การส่งข้อมูลล้มเหลว ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต', 'text-red-500');
+                console.error('Network Error:', error);
+                // เปลี่ยนข้อความแจ้งเตือนให้ชัดเจนขึ้น
+                showMessage('❌ ส่งไม่ผ่าน: โปรดเช็คสิทธิ์ Google Apps Script ว่าตั้งเป็น "ทุกคน" (Anyone) หรือยัง', 'text-red-500');
             } finally {
                 // ปลดล็อกปุ่ม
                 btnIn.disabled = false;
@@ -156,16 +216,14 @@
             }
         }
 
-        // ฟังก์ชันแสดงข้อความสถานะ
         function showMessage(msg, colorClass) {
             statusMessage.className = `mt-4 text-center text-sm font-medium h-6 transition-all ${colorClass}`;
             statusMessage.textContent = msg;
             
-            // ลบข้อความทิ้งหลังผ่านไป 5 วินาที
             if(colorClass.includes('green') || colorClass.includes('red')) {
                 setTimeout(() => {
                     statusMessage.textContent = '';
-                }, 5000);
+                }, 6000);
             }
         }
     </script>
