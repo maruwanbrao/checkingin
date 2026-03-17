@@ -8,27 +8,30 @@
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Sarabun', sans-serif; background-color: #f3f4f6; }
-        .video-container { position: relative; background: #000; border-radius: 12px; overflow: hidden; aspect-ratio: 4/3; }
-        #camera { width: 100%; height: 100%; object-fit: cover; }
+        .video-container { position: relative; background: #000; border-radius: 12px; overflow: hidden; aspect-ratio: 4/3; width: 100%; }
+        #camera { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); } /* Mirror mode for selfie */
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
 
-    <div class="bg-white rounded-2xl shadow-xl w-full max-md overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
         <div class="bg-blue-600 p-4 text-center">
             <h1 class="text-2xl font-bold text-white">ระบบลงเวลาทำงาน</h1>
             <p class="text-blue-100 text-sm mt-1">Check-in / Check-out System</p>
         </div>
 
         <div class="p-6">
+            <!-- Camera Selection -->
             <div id="cameraSelectDiv" class="mb-3 hidden">
                 <label class="text-xs text-gray-500 mb-1 block">เลือกกล้อง:</label>
                 <select id="cameraSelect" class="w-full text-sm px-3 py-2 border border-gray-300 rounded-lg outline-none bg-gray-50"></select>
             </div>
 
+            <!-- Video Display -->
             <div class="video-container mb-4 flex items-center justify-center">
                 <video id="camera" autoplay playsinline></video>
-                <div id="loadingSign" class="absolute text-white text-xs text-center">
+                <div id="loadingSign" class="absolute text-white text-xs text-center flex flex-col items-center">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2"></div>
                     <p>กำลังเตรียมกล้อง...</p>
                 </div>
             </div>
@@ -41,16 +44,16 @@
             </div>
 
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="submitData('เข้างาน')" id="btnIn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg shadow disabled:opacity-50">เข้างาน</button>
-                <button onclick="submitData('ออกงาน')" id="btnOut" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg shadow disabled:opacity-50">ออกงาน</button>
+                <button onclick="submitData('เข้างาน')" id="btnIn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg shadow-md active:transform active:scale-95 transition disabled:opacity-50">เข้างาน</button>
+                <button onclick="submitData('ออกงาน')" id="btnOut" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg shadow-md active:transform active:scale-95 transition disabled:opacity-50">ออกงาน</button>
             </div>
 
-            <div id="statusMessage" class="mt-4 text-center text-sm font-medium min-h-[20px]"></div>
+            <div id="statusMessage" class="mt-4 text-center text-sm font-medium min-h-[24px] p-2 rounded"></div>
         </div>
     </div>
 
     <script>
-        // ใช้ลิงก์ใหม่ที่คุณส่งมา
+        // ลิงก์ที่ใช้ Deploy ล่าสุดของคุณ
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz_ntLPIAnvJlu_FmpluqwYIrhw3c2xX7Nr13_-fHBsDVYAKDzkkh9VZeV5zIdED5n7/exec';
 
         const video = document.getElementById('camera');
@@ -59,77 +62,103 @@
         const cameraSelectDiv = document.getElementById('cameraSelectDiv');
         let currentStream = null;
 
+        // เริ่มต้นขอสิทธิ์การใช้งานกล้อง
         async function startApp() {
             try {
+                // ขั้นแรกต้องขอสิทธิ์ให้ผ่านก่อน
                 const initialStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 initialStream.getTracks().forEach(track => track.stop());
                 
+                // ดึงรายชื่ออุปกรณ์
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const videoDevices = devices.filter(d => d.kind === 'videoinput');
 
                 if (videoDevices.length > 0) {
                     cameraSelectDiv.classList.remove('hidden');
+                    cameraSelect.innerHTML = '';
                     videoDevices.forEach(device => {
                         const opt = document.createElement('option');
                         opt.value = device.deviceId;
-                        opt.text = device.label || 'Camera';
+                        opt.text = device.label || `Camera ${cameraSelect.length + 1}`;
                         cameraSelect.appendChild(opt);
                     });
+                    
                     cameraSelect.onchange = () => openCamera(cameraSelect.value);
                     await openCamera(videoDevices[0].deviceId);
                 }
             } catch (err) {
-                loadingSign.innerHTML = '<p class="text-red-500">ไม่สามารถเปิดกล้องได้</p>';
+                console.error("Camera access denied:", err);
+                loadingSign.innerHTML = '<p class="text-red-500 font-bold">ไม่สามารถเข้าถึงกล้องได้<br><span class="text-[10px] font-normal">โปรดอนุญาตให้เข้าถึงกล้องใน Browser</span></p>';
             }
         }
 
         async function openCamera(id) {
-            if (currentStream) currentStream.getTracks().forEach(t => t.stop());
-            currentStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: id } });
-            video.srcObject = currentStream;
-            loadingSign.classList.add('hidden');
+            if (currentStream) {
+                currentStream.getTracks().forEach(t => t.stop());
+            }
+            try {
+                currentStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { deviceId: id ? { exact: id } : undefined } 
+                });
+                video.srcObject = currentStream;
+                loadingSign.classList.add('hidden');
+            } catch (err) {
+                console.error("Error switching camera:", err);
+            }
         }
 
         async function submitData(type) {
             const name = document.getElementById('employeeName').value.trim();
-            if (!name) return alert('กรุณาใส่ชื่อ');
+            if (!name) {
+                showStatus('❌ กรุณาใส่ชื่อพนักงาน', 'text-red-600 bg-red-50');
+                return;
+            }
 
             const btnIn = document.getElementById('btnIn');
             const btnOut = document.getElementById('btnOut');
-            const status = document.getElementById('statusMessage');
-
+            
             btnIn.disabled = btnOut.disabled = true;
-            status.innerText = "กำลังบันทึกข้อมูล...";
-            status.className = "mt-4 text-center text-sm text-blue-600";
+            showStatus('⌛ กำลังส่งข้อมูลไปยัง Google Sheets...', 'text-blue-600 bg-blue-50');
 
             try {
                 const canvas = document.getElementById('snapshot');
-                canvas.width = 400;
-                canvas.height = 300;
-                canvas.getContext('2d').drawImage(video, 0, 0, 400, 300);
-                const base64 = canvas.toDataURL('image/jpeg', 0.6);
+                canvas.width = 640;
+                canvas.height = 480;
+                const ctx = canvas.getContext('2d');
+                
+                // ถ่ายรูป (จัดการเรื่อง Mirror mode ในรูปถ่ายด้วย)
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                const base64 = canvas.toDataURL('image/jpeg', 0.7);
 
-                // ส่งแบบ POST พร้อมจัดการ error ที่อาจเกิดขึ้น
-                const response = await fetch(SCRIPT_URL, {
+                // ส่งแบบ POST โดยใช้ fetch
+                // หมายเหตุ: mode: 'no-cors' จะส่งข้อมูลได้ แต่เราจะอ่าน Response จาก Google ไม่ได้
+                // ข้อมูลจะเข้า Google Sheet แต่ status จะเป็น 0 (สำเร็จแบบเงียบๆ)
+                await fetch(SCRIPT_URL, {
                     method: 'POST',
-                    mode: 'no-cors', 
+                    mode: 'no-cors',
                     cache: 'no-cache',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: name, type: type, image: base64 })
                 });
 
-                // สำหรับ mode no-cors เราจะสรุปว่าสำเร็จหากไม่มี error throw ออกมา
-                status.innerText = "✅ บันทึกสำเร็จแล้ว!";
-                status.className = "mt-4 text-center text-sm text-green-600";
+                showStatus(`✅ บันทึก ${type} สำเร็จแล้ว!`, 'text-green-600 bg-green-50');
                 document.getElementById('employeeName').value = "";
                 
             } catch (e) {
-                console.error(e);
-                status.innerText = "❌ เกิดข้อผิดพลาดในการเชื่อมต่อ";
-                status.className = "mt-4 text-center text-sm text-red-600";
+                console.error("Submit error:", e);
+                showStatus("❌ ส่งข้อมูลล้มเหลว", "text-red-600 bg-red-50");
             } finally {
                 btnIn.disabled = btnOut.disabled = false;
             }
+        }
+
+        function showStatus(msg, classes) {
+            const status = document.getElementById('statusMessage');
+            status.innerText = msg;
+            status.className = `mt-4 text-center text-sm font-medium min-h-[24px] p-2 rounded ${classes}`;
         }
 
         window.onload = startApp;
