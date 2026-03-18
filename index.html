@@ -557,6 +557,35 @@
     .history-status { font-size: 12px; color: var(--accent-in); flex-shrink: 0; }
     .history-status.err { color: var(--accent-out); }
 
+    /* ===== CAMERA SELECT ===== */
+    .camera-select-wrap {
+      width: 100%;
+      position: relative;
+    }
+    .camera-select {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 36px 9px 12px;
+      color: var(--text);
+      font-family: 'Sarabun', sans-serif;
+      font-size: 13px;
+      outline: none;
+      appearance: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .camera-select:focus { border-color: var(--accent-blue); }
+    .camera-select-icon {
+      position: absolute;
+      right: 10px; top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      color: var(--text-dim);
+      font-size: 12px;
+    }
+
     /* ===== CANVAS (hidden) ===== */
     #snapshot-canvas { display: none; }
 
@@ -614,6 +643,13 @@
       </div>
       <canvas id="snapshot-canvas"></canvas>
 
+      <div class="camera-select-wrap" id="camera-select-wrap">
+        <select class="camera-select" id="camera-select" onchange="switchCamera()">
+          <option value="">⏳ กำลังค้นหากล้อง...</option>
+        </select>
+        <span class="camera-select-icon">▼</span>
+      </div>
+
       <button class="capture-btn in-mode" id="capture-btn" onclick="capturePhoto()">
         <div class="capture-btn-inner"></div>
       </button>
@@ -659,6 +695,11 @@
         <input type="url" class="text-input" id="gas-url-input" placeholder="https://script.google.com/macros/s/..." style="margin-top:6px" />
       </div>
       <div style="margin-top:14px">
+        <div class="field-label">ชื่อ Sheet (ใน Google Sheets)</div>
+        <input type="text" class="text-input" id="sheet-name-input" placeholder="Employee checking in" style="margin-top:6px" />
+        <div style="font-size:11px;color:var(--text-dim);margin-top:5px">ต้องตรงกับชื่อ Tab ใน Google Sheets ทุกตัวอักษร</div>
+      </div>
+      <div style="margin-top:14px">
         <div class="field-label">ชื่อพนักงาน (บันทึกไว้)</div>
         <input type="text" class="text-input" id="saved-name-input" placeholder="ตั้งชื่อเริ่มต้น..." style="margin-top:6px" />
       </div>
@@ -676,7 +717,9 @@
   let currentType = 'in';
   let stream = null;
   let capturedImageBase64 = null;
+  let selectedDeviceId = localStorage.getItem('camera_device_id') || '';
   let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbxdsGB5sh0iOdlwI1b8wRM2Xe85hBAomgFkwzD40Ksu-uyhC4BEyqwnk3Cqpc9kYg38/exec';
+  let SHEET_NAME = localStorage.getItem('sheet_name') || 'Employee checking in';
   let history = JSON.parse(localStorage.getItem('checkin_history') || '[]');
 
   // ============================================================
@@ -693,38 +736,65 @@
   // ============================================================
   // CAMERA
   // ============================================================
-  async function startCamera() {
+  // List all video devices and populate dropdown
+  async function enumerateDevices() {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
+      const sel = document.getElementById('camera-select');
+      sel.innerHTML = '';
+      if (videoDevices.length === 0) {
+        sel.innerHTML = '<option value="">ไม่พบกล้อง</option>';
+        return;
+      }
+      videoDevices.forEach((d, i) => {
+        const opt = document.createElement('option');
+        opt.value = d.deviceId;
+        opt.textContent = d.label || `กล้อง ${i + 1}`;
+        if (d.deviceId === selectedDeviceId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      // If no saved device, pick first non-virtual
+      if (!selectedDeviceId) {
+        const physicalCam = videoDevices.find(d => {
+          const lbl = (d.label || '').toLowerCase();
+          return !['virtual','obs','snap camera','manycam','droidcam','iriun'].some(k => lbl.includes(k));
+        });
+        const chosen = physicalCam || videoDevices[0];
+        selectedDeviceId = chosen.deviceId;
+        sel.value = selectedDeviceId;
+      }
+    } catch(e) { console.warn('enumerateDevices:', e); }
+  }
+
+  async function startCamera(deviceId) {
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
     const video = document.getElementById('video-feed');
     const frame = document.getElementById('camera-frame');
     const oldPH = frame.querySelector('.camera-placeholder');
     if (oldPH) oldPH.remove();
 
-    const attempts = [
-      { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: { exact: 'user' } } },
-      { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } },
-      { video: { width: { ideal: 640 }, height: { ideal: 480 } } },
-      { video: true }
-    ];
+    const useId = deviceId || selectedDeviceId;
+    const constraints = useId
+      ? { video: { deviceId: { exact: useId }, width: { ideal: 640 }, height: { ideal: 480 } } }
+      : { video: { width: { ideal: 640 }, height: { ideal: 480 } } };
 
-    let started = false;
-    for (const c of attempts) {
-      try {
-        const s = await navigator.mediaDevices.getUserMedia(c);
-        const label = (s.getVideoTracks()[0]?.label || '').toLowerCase();
-        const isVirtual = ['virtual','obs','snap camera','manycam','droidcam','iriun'].some(k => label.includes(k));
-        if (isVirtual) { s.getTracks().forEach(t => t.stop()); continue; }
-        stream = s;
-        video.srcObject = stream;
-        video.style.display = 'block';
-        document.getElementById('captured-img').style.display = 'none';
-        document.getElementById('cam-status').style.display = 'flex';
-        started = true;
-        break;
-      } catch(e) { console.warn('Camera attempt:', e.message); }
-    }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // Update selectedDeviceId from actual track
+      const track = stream.getVideoTracks()[0];
+      selectedDeviceId = track.getSettings().deviceId || useId;
+      localStorage.setItem('camera_device_id', selectedDeviceId);
+      // Sync dropdown
+      const sel = document.getElementById('camera-select');
+      if (sel) sel.value = selectedDeviceId;
 
-    if (!started) {
+      video.srcObject = stream;
+      video.style.display = 'block';
+      document.getElementById('captured-img').style.display = 'none';
+      document.getElementById('cam-status').style.display = 'flex';
+    } catch(e) {
+      console.warn('startCamera error:', e.message);
       video.style.display = 'none';
       frame.insertAdjacentHTML('beforeend', `
         <div class="camera-placeholder" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-dim)">
@@ -732,9 +802,20 @@
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
             <circle cx="12" cy="13" r="4"/>
           </svg>
-          <span style="font-size:13px;text-align:center">กรุณาอนุญาตการใช้กล้อง<br>แล้วกดปุ่มกล้องเพื่อลองอีกครั้ง</span>
+          <span style="font-size:13px;text-align:center">ไม่สามารถเปิดกล้องได้<br>${e.message}</span>
         </div>`);
     }
+  }
+
+  async function switchCamera() {
+    const sel = document.getElementById('camera-select');
+    selectedDeviceId = sel.value;
+    localStorage.setItem('camera_device_id', selectedDeviceId);
+    // Reset photo state
+    capturedImageBase64 = null;
+    document.getElementById('retake-btn').classList.remove('visible');
+    document.getElementById('capture-btn').style.display = 'flex';
+    await startCamera(selectedDeviceId);
   }
 
   function capturePhoto() {
@@ -850,27 +931,33 @@
     const imageData = capturedImageBase64 || '';
 
     try {
-      // GitHub Pages -> Google Apps Script requires no-cors mode.
-      // Apps Script receives FormData as e.parameter correctly.
-      // Since no-cors returns opaque response (unreadable), any non-throw = sent successfully.
-      const formData = new FormData();
-      formData.append('name', name);
-      formData.append('type', typeLabel);
-      formData.append('image', imageData);
+      // Apps Script (deployed as "Anyone") returns CORS headers, so we can read the response.
+      // Send as URLSearchParams so e.parameter works correctly in Apps Script.
+      const params = new URLSearchParams();
+      params.append('name', name);
+      params.append('type', typeLabel);
+      params.append('image', imageData);
 
-      await fetch(GAS_URL, {
+      const res = await fetch(GAS_URL, {
         method: 'POST',
-        body: formData,
-        mode: 'no-cors'
+        body: params,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        redirect: 'follow'
       });
 
-      showToast(`✓ บันทึก${typeLabel}สำเร็จ!`, 'success');
-      addHistory(name, typeLabel, 'success');
-      localStorage.setItem('saved_name', name);
+      const text = await res.text();
+      console.log('Apps Script response:', text);
 
+      if (text.includes('Success')) {
+        showToast(`✓ บันทึก${typeLabel}สำเร็จ!`, 'success');
+        addHistory(name, typeLabel, 'success');
+        localStorage.setItem('saved_name', name);
+      } else {
+        throw new Error(text || 'ไม่ได้รับการตอบกลับจากเซิร์ฟเวอร์');
+      }
     } catch (err) {
-      console.error(err);
-      showToast('❌ ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่', 'error');
+      console.error('Submit error:', err);
+      showToast('❌ ' + (err.message || 'เกิดข้อผิดพลาด').slice(0, 60), 'error');
       addHistory(name, typeLabel, 'error');
     } finally {
       submitBtn.disabled = false;
@@ -940,6 +1027,7 @@
   // ============================================================
   function openSettings() {
     document.getElementById('gas-url-input').value = GAS_URL;
+    document.getElementById('sheet-name-input').value = SHEET_NAME;
     document.getElementById('saved-name-input').value = localStorage.getItem('saved_name') || '';
     document.getElementById('settings-modal').classList.add('open');
   }
@@ -950,8 +1038,10 @@
 
   function saveSettings() {
     GAS_URL = document.getElementById('gas-url-input').value.trim();
+    SHEET_NAME = document.getElementById('sheet-name-input').value.trim() || 'Employee checking in';
     const savedName = document.getElementById('saved-name-input').value.trim();
     localStorage.setItem('gas_url', GAS_URL);
+    localStorage.setItem('sheet_name', SHEET_NAME);
     if (savedName) {
       localStorage.setItem('saved_name', savedName);
       document.getElementById('name-input').value = savedName;
@@ -968,8 +1058,10 @@
   // ============================================================
   // INIT
   // ============================================================
-  window.addEventListener('load', () => {
-    startCamera();
+  window.addEventListener('load', async () => {
+    // First get permission, then enumerate devices for accurate labels
+    await startCamera();
+    await enumerateDevices();
     renderHistory();
 
     // Restore saved name
