@@ -834,7 +834,8 @@
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0);
 
-    capturedImageBase64 = canvas.toDataURL('image/jpeg', 0.7);
+    // Compress to reasonable size for sending to Apps Script
+    capturedImageBase64 = canvas.toDataURL('image/jpeg', 0.55);
 
     img.src = capturedImageBase64;
     img.style.display = 'block';
@@ -948,9 +949,12 @@
       const text = await res.text();
       console.log('Apps Script response:', text);
 
-      if (text.includes('Success')) {
+      if (text.startsWith('Success')) {
+        // Response format: "Success|https://drive.google.com/..."
+        const parts = text.split('|');
+        const driveLink = parts[1] || '';
         showToast(`✓ บันทึก${typeLabel}สำเร็จ!`, 'success');
-        addHistory(name, typeLabel, 'success');
+        addHistory(name, typeLabel, 'success', driveLink);
         localStorage.setItem('saved_name', name);
       } else {
         throw new Error(text || 'ไม่ได้รับการตอบกลับจากเซิร์ฟเวอร์');
@@ -958,7 +962,7 @@
     } catch (err) {
       console.error('Submit error:', err);
       showToast('❌ ' + (err.message || 'เกิดข้อผิดพลาด').slice(0, 60), 'error');
-      addHistory(name, typeLabel, 'error');
+      addHistory(name, typeLabel, 'error', '');
     } finally {
       submitBtn.disabled = false;
       btnLabel.style.display = 'inline';
@@ -969,9 +973,9 @@
   // ============================================================
   // HISTORY
   // ============================================================
-  function addHistory(name, type, status) {
+  function addHistory(name, type, status, driveLink = '') {
     const item = {
-      name, type, status,
+      name, type, status, driveLink,
       time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       date: new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })
     };
@@ -993,6 +997,7 @@
         <div class="history-info">
           <div class="history-name">${escapeHTML(item.name)}</div>
           <div class="history-time">${item.date} · ${item.time}</div>
+          ${item.driveLink ? `<a href="${item.driveLink}" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent-blue);text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px">🔗 ดูรูปภาพ</a>` : ''}
         </div>
         <span class="history-status ${item.status === 'error' ? 'err' : ''}">${item.status === 'success' ? '✓ สำเร็จ' : '✗ ผิดพลาด'}</span>
       </div>
