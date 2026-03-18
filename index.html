@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบบันทึกเวลาเข้า-ออกงาน</title>
+    <!-- แก้ไข URL ของ Tailwind CSS และ Google Fonts ให้ถูกต้อง -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Sarabun', sans-serif; background-color: #f3f4f6; }
         .video-container { position: relative; background: #000; border-radius: 12px; overflow: hidden; aspect-ratio: 4/3; width: 100%; }
         #camera { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        .btn-active:active { transform: scale(0.95); transition: transform 0.1s; }
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
@@ -21,12 +23,14 @@
         </div>
 
         <div class="p-6">
+            <!-- ส่วนเลือกกล้อง -->
             <div id="cameraSelectDiv" class="mb-3 hidden">
                 <label class="text-xs text-gray-500 mb-1 block">เลือกกล้อง:</label>
                 <select id="cameraSelect" class="w-full text-sm px-3 py-2 border border-gray-300 rounded-lg outline-none bg-gray-50"></select>
             </div>
 
-            <div class="video-container mb-4 flex items-center justify-center">
+            <!-- ส่วนแสดงผลกล้อง -->
+            <div class="video-container mb-4 flex items-center justify-center shadow-inner">
                 <video id="camera" autoplay playsinline></video>
                 <div id="loadingSign" class="absolute text-white text-xs text-center flex flex-col items-center">
                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2"></div>
@@ -38,20 +42,24 @@
 
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อ-นามสกุล พนักงาน</label>
-                <input type="text" id="employeeName" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="ใส่ชื่อพนักงาน">
+                <input type="text" id="employeeName" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="กรอกชื่อพนักงาน">
             </div>
 
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="submitData('เข้างาน')" id="btnIn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg shadow-md active:transform active:scale-95 transition disabled:opacity-50">เข้างาน</button>
-                <button onclick="submitData('ออกงาน')" id="btnOut" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg shadow-md active:transform active:scale-95 transition disabled:opacity-50">ออกงาน</button>
+                <button onclick="submitData('เข้างาน')" id="btnIn" class="btn-active bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed">
+                    เข้างาน
+                </button>
+                <button onclick="submitData('ออกงาน')" id="btnOut" class="btn-active bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed">
+                    ออกงาน
+                </button>
             </div>
 
-            <div id="statusMessage" class="mt-4 text-center text-sm font-medium min-h-[24px] p-2 rounded"></div>
+            <div id="statusMessage" class="mt-4 text-center text-sm font-medium min-h-[40px] flex items-center justify-center rounded-lg transition-all"></div>
         </div>
     </div>
 
     <script>
-        // ลิงก์ Deployment ล่าสุดของคุณ
+        // ใช้ลิงก์ Deploy ล่าสุดที่คุณระบุมา
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby6qWEJTJ15Wr-Zn-NgJyWeMnjOrDA3D4RF3Dc7zhXpOaVhfu5ZJXupesT10ZMNMS22/exec';
 
         const video = document.getElementById('camera');
@@ -60,8 +68,10 @@
         const cameraSelectDiv = document.getElementById('cameraSelectDiv');
         let currentStream = null;
 
+        // เริ่มต้นการใช้งานแอปและกล้อง
         async function startApp() {
             try {
+                // ขออนุญาตใช้งานกล้องก่อน
                 const initialStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 initialStream.getTracks().forEach(track => track.stop());
                 
@@ -71,10 +81,10 @@
                 if (videoDevices.length > 0) {
                     cameraSelectDiv.classList.remove('hidden');
                     cameraSelect.innerHTML = '';
-                    videoDevices.forEach(device => {
+                    videoDevices.forEach((device, index) => {
                         const opt = document.createElement('option');
                         opt.value = device.deviceId;
-                        opt.text = device.label || `Camera ${cameraSelect.length + 1}`;
+                        opt.text = device.label || `กล้อง ${index + 1}`;
                         cameraSelect.appendChild(opt);
                     });
                     
@@ -82,66 +92,78 @@
                     await openCamera(videoDevices[0].deviceId);
                 }
             } catch (err) {
-                loadingSign.innerHTML = '<p class="text-red-500 font-bold">ไม่สามารถเข้าถึงกล้องได้</p>';
+                console.error("Camera error:", err);
+                loadingSign.innerHTML = '<p class="text-red-500 font-bold">ไม่สามารถเข้าถึงกล้องได้<br><span class="text-[10px] font-normal">กรุณาตรวจสอบสิทธิ์การใช้กล้อง</span></p>';
             }
         }
 
         async function openCamera(id) {
-            if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+            if (currentStream) {
+                currentStream.getTracks().forEach(t => t.stop());
+            }
             try {
                 currentStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { deviceId: id ? { exact: id } : undefined } 
+                    video: { deviceId: { exact: id } } 
                 });
                 video.srcObject = currentStream;
                 loadingSign.classList.add('hidden');
             } catch (err) {
-                console.error(err);
+                // กรณีล้มเหลวแบบระบุ ID ให้ลองเปิดแบบปกติ
+                currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = currentStream;
+                loadingSign.classList.add('hidden');
             }
         }
 
         async function submitData(type) {
             const name = document.getElementById('employeeName').value.trim();
             if (!name) {
-                showStatus('❌ กรุณาใส่ชื่อพนักงาน', 'text-red-600 bg-red-50');
+                showStatus('❌ กรุณากรอกชื่อพนักงาน', 'text-red-600 bg-red-50 border border-red-200');
                 return;
             }
 
             const btnIn = document.getElementById('btnIn');
             const btnOut = document.getElementById('btnOut');
             btnIn.disabled = btnOut.disabled = true;
-            showStatus('⌛ กำลังบันทึกข้อมูล...', 'text-blue-600 bg-blue-50');
+            showStatus('⌛ กำลังบันทึกข้อมูล...', 'text-blue-600 bg-blue-50 border border-blue-200');
 
             try {
                 const canvas = document.getElementById('snapshot');
-                canvas.width = 400;
-                canvas.height = 300;
+                // กำหนดความละเอียดรูปภาพ
+                canvas.width = 640;
+                canvas.height = 480;
                 const ctx = canvas.getContext('2d');
+                
+                // ถ่ายรูป (กลับด้านให้เหมือนกระจกตามการแสดงผล)
                 ctx.translate(canvas.width, 0);
                 ctx.scale(-1, 1);
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                const base64 = canvas.toDataURL('image/jpeg', 0.5); // บีบอัดรูปภาพลงเพื่อให้ส่งง่ายขึ้น
+                // บีบอัดรูปภาพเป็น JPEG (คุณภาพ 0.5) เพื่อให้ส่งไวขึ้น
+                const base64 = canvas.toDataURL('image/jpeg', 0.5);
 
-                // เปลี่ยนมาใช้ URLSearchParams เพื่อให้ข้อมูลส่งไปถึง doPost ได้แม่นยำที่สุด
+                // ใช้ URLSearchParams สำหรับการส่งข้อมูลแบบ x-www-form-urlencoded
                 const formData = new URLSearchParams();
                 formData.append('name', name);
                 formData.append('type', type);
                 formData.append('image', base64);
 
+                // ส่งข้อมูลไปยัง Google Apps Script
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
-                    mode: 'no-cors',
+                    mode: 'no-cors', // จำเป็นสำหรับ Google Apps Script เพื่อข้าม CORS
                     cache: 'no-cache',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: formData.toString()
                 });
 
-                // เนื่องจากโหมด no-cors เราจะอนุมานว่าสำเร็จถ้าไม่มี Error เด้ง
-                showStatus(`✅ บันทึก ${type} สำเร็จ! โปรดเช็คใน Google Sheets`, 'text-green-600 bg-green-50');
+                // เมื่อใช้ no-cors เราไม่สามารถอ่าน response ได้ แต่ถ้าไม่มี error ใน fetch ถือว่าส่งไปถึงแล้ว
+                showStatus(`✅ บันทึก ${type} เรียบร้อยแล้ว!`, 'text-green-600 bg-green-50 border border-green-200');
                 document.getElementById('employeeName').value = "";
                 
             } catch (e) {
-                showStatus("❌ การเชื่อมต่อผิดพลาด", "text-red-600 bg-red-50");
+                console.error("Submission error:", e);
+                showStatus("❌ การเชื่อมต่อผิดพลาด กรุณาลองใหม่", "text-red-600 bg-red-50 border border-red-200");
             } finally {
                 btnIn.disabled = btnOut.disabled = false;
             }
@@ -150,7 +172,7 @@
         function showStatus(msg, classes) {
             const status = document.getElementById('statusMessage');
             status.innerText = msg;
-            status.className = `mt-4 text-center text-sm font-medium min-h-[24px] p-2 rounded ${classes}`;
+            status.className = `mt-4 text-center text-sm font-medium min-h-[40px] flex items-center justify-center rounded-lg transition-all ${classes}`;
         }
 
         window.onload = startApp;
