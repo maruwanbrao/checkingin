@@ -1,168 +1,973 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบบันทึกเวลาเข้า-ออกงาน</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Sarabun', sans-serif; background-color: #f3f4f6; }
-        .video-container { position: relative; background: #000; border-radius: 12px; overflow: hidden; aspect-ratio: 4/3; width: 100%; }
-        #camera { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-        .btn-active:active { transform: scale(0.95); transition: transform 0.1s; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Taptop · ระบบเข้า-ออกงาน</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --card: #1a1a24;
+      --border: #2a2a3a;
+      --accent-in: #00e5a0;
+      --accent-out: #ff4d6d;
+      --accent-blue: #4d9fff;
+      --text: #f0f0f8;
+      --text-dim: #7a7a9a;
+      --glow-in: rgba(0,229,160,0.18);
+      --glow-out: rgba(255,77,109,0.18);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 48px;
+      overflow-x: hidden;
+    }
+
+    /* Ambient background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -20%;
+      left: -10%;
+      width: 60vw;
+      height: 60vw;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(77,159,255,0.05) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::after {
+      content: '';
+      position: fixed;
+      bottom: -10%;
+      right: -10%;
+      width: 50vw;
+      height: 50vw;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,229,160,0.04) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ===== HEADER ===== */
+    header {
+      width: 100%;
+      max-width: 520px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-in));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+
+    .logo-text {
+      font-family: 'Space Mono', monospace;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--text);
+    }
+
+    .logo-text span { color: var(--accent-blue); }
+
+    .clock-badge {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 6px 14px;
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    #live-clock { color: var(--text); }
+
+    /* ===== MAIN CARD ===== */
+    .main-card {
+      width: 100%;
+      max-width: 520px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      overflow: hidden;
+      position: relative;
+      z-index: 1;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+    }
+
+    /* ===== TYPE TOGGLE ===== */
+    .type-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .type-btn {
+      padding: 18px;
+      border: none;
+      background: transparent;
+      color: var(--text-dim);
+      font-family: 'Sarabun', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      position: relative;
+    }
+
+    .type-btn::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+      background: transparent;
+      transition: background 0.3s ease;
+    }
+
+    .type-btn.active-in {
+      color: var(--accent-in);
+      background: var(--glow-in);
+    }
+    .type-btn.active-in::after { background: var(--accent-in); }
+
+    .type-btn.active-out {
+      color: var(--accent-out);
+      background: var(--glow-out);
+    }
+    .type-btn.active-out::after { background: var(--accent-out); }
+
+    .type-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* ===== CAMERA SECTION ===== */
+    .camera-section {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .camera-frame {
+      width: 100%;
+      aspect-ratio: 4/3;
+      border-radius: 16px;
+      overflow: hidden;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      position: relative;
+      transition: border-color 0.3s ease;
+    }
+
+    .camera-frame.active-in-border { border-color: var(--accent-in); box-shadow: 0 0 24px var(--glow-in); }
+    .camera-frame.active-out-border { border-color: var(--accent-out); box-shadow: 0 0 24px var(--glow-out); }
+
+    #video-feed, #captured-img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    #captured-img { display: none; }
+
+    .camera-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    /* Corner brackets */
+    .corner { position: absolute; width: 20px; height: 20px; border-color: currentColor; border-style: solid; }
+    .corner-tl { top: 12px; left: 12px; border-width: 2px 0 0 2px; }
+    .corner-tr { top: 12px; right: 12px; border-width: 2px 2px 0 0; }
+    .corner-bl { bottom: 12px; left: 12px; border-width: 0 0 2px 2px; }
+    .corner-br { bottom: 12px; right: 12px; border-width: 0 2px 2px 0; }
+
+    .corner-in { color: var(--accent-in); }
+    .corner-out { color: var(--accent-out); }
+
+    .camera-status {
+      position: absolute;
+      top: 12px; right: 12px;
+      background: rgba(0,0,0,0.7);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .rec-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #ff4040;
+      animation: blink 1.2s infinite;
+    }
+
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+    /* Placeholder when no camera */
+    .camera-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 12px;
+      color: var(--text-dim);
+    }
+
+    .camera-placeholder svg { opacity: 0.4; }
+
+    /* ===== CAPTURE BUTTON ===== */
+    .capture-btn {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      border: 3px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .capture-btn:hover { transform: scale(1.05); }
+    .capture-btn:active { transform: scale(0.95); }
+
+    .capture-btn-inner {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: background 0.3s ease;
+    }
+
+    .capture-btn.in-mode .capture-btn-inner { background: var(--accent-in); box-shadow: 0 0 16px var(--glow-in); }
+    .capture-btn.in-mode { border-color: var(--accent-in); }
+    .capture-btn.out-mode .capture-btn-inner { background: var(--accent-out); box-shadow: 0 0 16px var(--glow-out); }
+    .capture-btn.out-mode { border-color: var(--accent-out); }
+
+    .retake-btn {
+      padding: 8px 20px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-dim);
+      font-family: 'Sarabun', sans-serif;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: none;
+    }
+    .retake-btn:hover { border-color: var(--text-dim); color: var(--text); }
+    .retake-btn.visible { display: block; }
+
+    /* ===== FORM SECTION ===== */
+    .form-section {
+      padding: 0 24px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .field-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    .text-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      color: var(--text);
+      font-family: 'Sarabun', sans-serif;
+      font-size: 15px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .text-input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(77,159,255,0.1); }
+    .text-input::placeholder { color: var(--text-dim); }
+
+    /* ===== SUBMIT BUTTON ===== */
+    .submit-btn {
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      border: none;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .submit-btn.btn-in {
+      background: linear-gradient(135deg, #00c87a, #00e5a0);
+      color: #001a10;
+      box-shadow: 0 8px 32px var(--glow-in);
+    }
+    .submit-btn.btn-out {
+      background: linear-gradient(135deg, #e0304f, #ff4d6d);
+      color: #fff;
+      box-shadow: 0 8px 32px var(--glow-out);
+    }
+
+    .submit-btn:hover { transform: translateY(-2px); filter: brightness(1.05); }
+    .submit-btn:active { transform: translateY(0); }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* Loading spinner */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== TOAST ===== */
+    #toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px 24px;
+      font-size: 15px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 100;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+      transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+      white-space: nowrap;
+    }
+
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    #toast.success { border-color: var(--accent-in); }
+    #toast.error { border-color: var(--accent-out); }
+    .toast-icon { font-size: 18px; }
+
+    /* ===== SETTINGS MODAL ===== */
+    .settings-icon {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      color: var(--text-dim);
+    }
+    .settings-icon:hover { border-color: var(--accent-blue); color: var(--text); }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .btn-secondary {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-dim);
+      font-family: 'Sarabun', sans-serif;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover { border-color: var(--text-dim); color: var(--text); }
+
+    .btn-primary {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      border: none;
+      background: var(--accent-blue);
+      color: #fff;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary:hover { filter: brightness(1.1); }
+
+    /* ===== HISTORY ===== */
+    .history-section {
+      width: 100%;
+      max-width: 520px;
+      margin-top: 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding: 0 4px;
+    }
+
+    .history-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .clear-btn {
+      font-size: 12px;
+      color: var(--text-dim);
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .clear-btn:hover { color: var(--accent-out); }
+
+    #history-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .history-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .history-badge {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .badge-in { background: var(--glow-in); color: var(--accent-in); border: 1px solid rgba(0,229,160,0.3); }
+    .badge-out { background: var(--glow-out); color: var(--accent-out); border: 1px solid rgba(255,77,109,0.3); }
+
+    .history-info { flex: 1; min-width: 0; }
+    .history-name { font-size: 14px; font-weight: 600; }
+    .history-time { font-size: 12px; color: var(--text-dim); font-family: 'Space Mono', monospace; margin-top: 2px; }
+
+    .history-status { font-size: 12px; color: var(--accent-in); flex-shrink: 0; }
+    .history-status.err { color: var(--accent-out); }
+
+    /* ===== CANVAS (hidden) ===== */
+    #snapshot-canvas { display: none; }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 420px) {
+      body { padding: 16px 12px 40px; }
+      .camera-section { padding: 16px; }
+      .form-section { padding: 0 16px 16px; }
+      .logo-text { font-size: 16px; }
+    }
+  </style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
+<body>
 
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-        <div class="bg-blue-600 p-4 text-center">
-            <h1 class="text-2xl font-bold text-white">ระบบลงเวลาทำงาน</h1>
-            <p class="text-blue-100 text-sm mt-1">Check-in / Check-out System</p>
-        </div>
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <div class="logo-text">Tap<span>top</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="clock-badge"><span id="live-clock">--:--:--</span></div>
+      <div class="settings-icon" onclick="openSettings()" title="ตั้งค่า">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+      </div>
+    </div>
+  </header>
 
-        <div class="p-6">
-            <!-- ส่วนเลือกกล้อง (จะแสดงเมื่อมีมากกว่า 1 ตัว) -->
-            <div id="cameraSelectDiv" class="mb-3 hidden">
-                <label class="text-xs text-gray-500 mb-1 block">เลือกกล้อง:</label>
-                <select id="cameraSelect" class="w-full text-sm px-3 py-2 border border-gray-300 rounded-lg outline-none bg-gray-50"></select>
-            </div>
-
-            <!-- ส่วนแสดงผลวิดีโอ -->
-            <div class="video-container mb-4 flex items-center justify-center shadow-inner">
-                <video id="camera" autoplay playsinline></video>
-                <div id="loadingSign" class="absolute text-white text-xs text-center flex flex-col items-center">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2"></div>
-                    <p>กำลังเตรียมกล้อง...</p>
-                </div>
-            </div>
-
-            <canvas id="snapshot" class="hidden"></canvas>
-
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อ-นามสกุล พนักงาน</label>
-                <input type="text" id="employeeName" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="กรอกชื่อพนักงาน">
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <button onclick="submitData('เข้างาน')" id="btnIn" class="btn-active bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg shadow-md disabled:opacity-50">เข้างาน</button>
-                <button onclick="submitData('ออกงาน')" id="btnOut" class="btn-active bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg shadow-md disabled:opacity-50">ออกงาน</button>
-            </div>
-
-            <div id="statusMessage" class="mt-4 text-center text-sm font-medium min-h-[40px] flex items-center justify-center rounded-lg transition-all"></div>
-        </div>
+  <div class="main-card">
+    <!-- Type Toggle -->
+    <div class="type-toggle">
+      <button class="type-btn active-in" id="btn-checkin" onclick="setType('in')">
+        <div class="type-dot"></div> เข้างาน
+      </button>
+      <button class="type-btn" id="btn-checkout" onclick="setType('out')">
+        <div class="type-dot"></div> ออกงาน
+      </button>
     </div>
 
-    <script>
-        /**
-         * สำคัญ: นำลิงก์ที่ได้จาก "New Deployment" ใน Google Apps Script มาวางที่นี่
-         */
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxdsGB5sh0iOdlwI1b8wRM2Xe85hBAomgFkwzD40Ksu-uyhC4BEyqwnk3Cqpc9kYg38/exec';
+    <!-- Camera -->
+    <div class="camera-section">
+      <div class="camera-frame" id="camera-frame">
+        <video id="video-feed" autoplay playsinline muted></video>
+        <img id="captured-img" alt="ภาพถ่าย" />
+        <div class="camera-overlay">
+          <div class="corner corner-tl corner-in" id="corner-tl"></div>
+          <div class="corner corner-tr corner-in" id="corner-tr"></div>
+          <div class="corner corner-bl corner-in" id="corner-bl"></div>
+          <div class="corner corner-br corner-in" id="corner-br"></div>
+          <div class="camera-status" id="cam-status">
+            <div class="rec-dot"></div><span>LIVE</span>
+          </div>
+        </div>
+      </div>
+      <canvas id="snapshot-canvas"></canvas>
 
-        const video = document.getElementById('camera');
-        const loadingSign = document.getElementById('loadingSign');
-        const cameraSelect = document.getElementById('cameraSelect');
-        const cameraSelectDiv = document.getElementById('cameraSelectDiv');
-        let currentStream = null;
+      <button class="capture-btn in-mode" id="capture-btn" onclick="capturePhoto()">
+        <div class="capture-btn-inner"></div>
+      </button>
+      <button class="retake-btn" id="retake-btn" onclick="retakePhoto()">↩ ถ่ายใหม่</button>
+    </div>
 
-        // ฟังก์ชันเริ่มการทำงานกล้อง
-        async function startApp() {
-            try {
-                const initialStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                initialStream.getTracks().forEach(track => track.stop());
-                
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(d => d.kind === 'videoinput');
+    <!-- Form -->
+    <div class="form-section">
+      <div>
+        <div class="field-label">ชื่อ-นามสกุล</div>
+        <div class="input-wrap">
+          <input type="text" class="text-input" id="name-input" placeholder="กรอกชื่อของคุณ..." autocomplete="name" />
+        </div>
+      </div>
 
-                if (videoDevices.length > 0) {
-                    cameraSelectDiv.classList.remove('hidden');
-                    cameraSelect.innerHTML = '';
-                    videoDevices.forEach((device, index) => {
-                        const opt = document.createElement('option');
-                        opt.value = device.deviceId;
-                        opt.text = device.label || `กล้อง ${index + 1}`;
-                        cameraSelect.appendChild(opt);
-                    });
-                    
-                    cameraSelect.onchange = () => openCamera(cameraSelect.value);
-                    await openCamera(videoDevices[0].deviceId);
-                }
-            } catch (err) {
-                loadingSign.innerHTML = '<p class="text-red-500 font-bold">ไม่สามารถเข้าถึงกล้องได้</p>';
-            }
-        }
+      <button class="submit-btn btn-in" id="submit-btn" onclick="submitData()">
+        <span id="btn-label">✓ บันทึกเข้างาน</span>
+        <div class="spinner" id="spinner"></div>
+      </button>
+    </div>
+  </div>
 
-        async function openCamera(id) {
-            if (currentStream) currentStream.getTracks().forEach(t => t.stop());
-            try {
-                currentStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { deviceId: id ? { exact: id } : undefined } 
-                });
-                video.srcObject = currentStream;
-                loadingSign.classList.add('hidden');
-            } catch (err) {
-                console.error(err);
-            }
-        }
+  <!-- History -->
+  <div class="history-section">
+    <div class="history-header">
+      <div class="history-title">ประวัติล่าสุด</div>
+      <button class="clear-btn" onclick="clearHistory()">ลบทั้งหมด</button>
+    </div>
+    <div id="history-list"></div>
+  </div>
 
-        async function submitData(type) {
-            const name = document.getElementById('employeeName').value.trim();
-            if (!name) {
-                showStatus('❌ กรุณากรอกชื่อพนักงาน', 'text-red-600 bg-red-50 border border-red-200');
-                return;
-            }
+  <!-- Toast -->
+  <div id="toast"><span class="toast-icon" id="toast-icon">✓</span><span id="toast-msg">บันทึกสำเร็จ</span></div>
 
-            const btnIn = document.getElementById('btnIn');
-            const btnOut = document.getElementById('btnOut');
-            btnIn.disabled = btnOut.disabled = true;
-            showStatus('⌛ กำลังบันทึกข้อมูล...', 'text-blue-600 bg-blue-50 border border-blue-200');
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal">
+      <div class="modal-title">
+        ⚙️ ตั้งค่าระบบ
+      </div>
+      <div>
+        <div class="field-label">Google Apps Script URL</div>
+        <input type="url" class="text-input" id="gas-url-input" placeholder="https://script.google.com/macros/s/..." style="margin-top:6px" />
+      </div>
+      <div style="margin-top:14px">
+        <div class="field-label">ชื่อพนักงาน (บันทึกไว้)</div>
+        <input type="text" class="text-input" id="saved-name-input" placeholder="ตั้งชื่อเริ่มต้น..." style="margin-top:6px" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeSettings()">ยกเลิก</button>
+        <button class="btn-primary" onclick="saveSettings()">บันทึก</button>
+      </div>
+    </div>
+  </div>
 
-            try {
-                const canvas = document.getElementById('snapshot');
-                canvas.width = 400;
-                canvas.height = 300;
-                const ctx = canvas.getContext('2d');
-                
-                // ถ่ายรูป (กลับด้านให้เหมือนกระจก)
-                ctx.translate(canvas.width, 0);
-                ctx.scale(-1, 1);
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                const base64 = canvas.toDataURL('image/jpeg', 0.5);
+<script>
+  // ============================================================
+  // STATE
+  // ============================================================
+  let currentType = 'in';
+  let stream = null;
+  let capturedImageBase64 = null;
+  let GAS_URL = localStorage.getItem('gas_url') || '';
+  let history = JSON.parse(localStorage.getItem('checkin_history') || '[]');
 
-                // ส่งข้อมูลแบบ x-www-form-urlencoded เพื่อให้เข้า e.parameter ของ Code.gs ได้ถูกต้อง
-                const formData = new URLSearchParams();
-                formData.append('name', name);
-                formData.append('type', type);
-                formData.append('image', base64);
+  // ============================================================
+  // CLOCK
+  // ============================================================
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('live-clock').textContent =
+      now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
 
-                await fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors', // สำคัญสำหรับ Google Apps Script
-                    cache: 'no-cache',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData.toString()
-                });
+  // ============================================================
+  // CAMERA
+  // ============================================================
+  async function startCamera() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+      });
+      const video = document.getElementById('video-feed');
+      video.srcObject = stream;
+      video.style.display = 'block';
+      document.getElementById('captured-img').style.display = 'none';
+      document.getElementById('cam-status').style.display = 'flex';
+    } catch (err) {
+      console.warn('Camera error:', err);
+      // Show placeholder
+      const frame = document.getElementById('camera-frame');
+      frame.innerHTML += `
+        <div class="camera-placeholder">
+          <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          <span style="font-size:13px">ไม่สามารถเข้าถึงกล้องได้<br>กดถ่ายรูปเพื่อลองอีกครั้ง</span>
+        </div>`;
+    }
+  }
 
-                // แจ้งผลสำเร็จ (เนื่องจากโหมด no-cors ไม่คืนค่า response เราจึงแจ้งผลตามการทำงานฝั่ง client)
-                showStatus(`✅ บันทึก ${type} เรียบร้อยแล้ว!`, 'text-green-600 bg-green-50 border border-green-200');
-                document.getElementById('employeeName').value = "";
-                
-            } catch (e) {
-                console.error(e);
-                showStatus("❌ การเชื่อมต่อผิดพลาด", "text-red-600 bg-red-50 border border-red-200");
-            } finally {
-                btnIn.disabled = btnOut.disabled = false;
-            }
-        }
+  function capturePhoto() {
+    const video = document.getElementById('video-feed');
+    const canvas = document.getElementById('snapshot-canvas');
+    const img = document.getElementById('captured-img');
 
-        function showStatus(msg, classes) {
-            const status = document.getElementById('statusMessage');
-            status.innerText = msg;
-            status.className = `mt-4 text-center text-sm font-medium min-h-[40px] flex items-center justify-center rounded-lg transition-all ${classes}`;
-        }
+    if (!stream || !video.srcObject) {
+      // Try to start camera if not available
+      startCamera();
+      return;
+    }
 
-        window.onload = startApp;
-    </script>
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+
+    capturedImageBase64 = canvas.toDataURL('image/jpeg', 0.7);
+
+    img.src = capturedImageBase64;
+    img.style.display = 'block';
+    video.style.display = 'none';
+    document.getElementById('cam-status').style.display = 'none';
+    document.getElementById('retake-btn').classList.add('visible');
+    document.getElementById('capture-btn').style.display = 'none';
+
+    showToast('📸 ถ่ายรูปสำเร็จ', 'info');
+  }
+
+  function retakePhoto() {
+    capturedImageBase64 = null;
+    const video = document.getElementById('video-feed');
+    const img = document.getElementById('captured-img');
+    video.style.display = 'block';
+    img.style.display = 'none';
+    document.getElementById('cam-status').style.display = 'flex';
+    document.getElementById('retake-btn').classList.remove('visible');
+    document.getElementById('capture-btn').style.display = 'flex';
+  }
+
+  // ============================================================
+  // TYPE TOGGLE
+  // ============================================================
+  function setType(type) {
+    currentType = type;
+    const btnIn = document.getElementById('btn-checkin');
+    const btnOut = document.getElementById('btn-checkout');
+    const frame = document.getElementById('camera-frame');
+    const captureBtn = document.getElementById('capture-btn');
+    const submitBtn = document.getElementById('submit-btn');
+    const btnLabel = document.getElementById('btn-label');
+    const corners = ['corner-tl','corner-tr','corner-bl','corner-br'];
+
+    if (type === 'in') {
+      btnIn.className = 'type-btn active-in';
+      btnOut.className = 'type-btn';
+      frame.className = 'camera-frame active-in-border';
+      captureBtn.className = 'capture-btn in-mode';
+      submitBtn.className = 'submit-btn btn-in';
+      btnLabel.textContent = '✓ บันทึกเข้างาน';
+      corners.forEach(id => {
+        document.getElementById(id).className = `corner ${id.replace('corner-', 'corner-')} corner-in`;
+      });
+    } else {
+      btnIn.className = 'type-btn';
+      btnOut.className = 'type-btn active-out';
+      frame.className = 'camera-frame active-out-border';
+      captureBtn.className = 'capture-btn out-mode';
+      submitBtn.className = 'submit-btn btn-out';
+      btnLabel.textContent = '✕ บันทึกออกงาน';
+      corners.forEach(id => {
+        const el = document.getElementById(id);
+        el.className = el.className.replace('corner-in', 'corner-out');
+      });
+    }
+  }
+
+  // Fix corner IDs (simpler approach)
+  document.addEventListener('DOMContentLoaded', () => {
+    const overlays = document.querySelectorAll('.corner');
+    overlays.forEach((el, i) => {
+      const ids = ['corner-tl', 'corner-tr', 'corner-bl', 'corner-br'];
+      el.id = ids[i];
+    });
+  });
+
+  // ============================================================
+  // SUBMIT
+  // ============================================================
+  async function submitData() {
+    const name = document.getElementById('name-input').value.trim();
+    if (!name) {
+      showToast('⚠️ กรุณากรอกชื่อก่อน', 'error');
+      document.getElementById('name-input').focus();
+      return;
+    }
+    if (!GAS_URL) {
+      showToast('⚙️ กรุณาตั้งค่า URL ก่อน', 'error');
+      openSettings();
+      return;
+    }
+
+    // UI loading state
+    const submitBtn = document.getElementById('submit-btn');
+    const btnLabel = document.getElementById('btn-label');
+    const spinner = document.getElementById('spinner');
+    submitBtn.disabled = true;
+    btnLabel.style.display = 'none';
+    spinner.style.display = 'block';
+
+    const typeLabel = currentType === 'in' ? 'เข้างาน' : 'ออกงาน';
+    const imageData = capturedImageBase64 || '';
+
+    try {
+      const params = new URLSearchParams();
+      params.append('name', name);
+      params.append('type', typeLabel);
+      params.append('image', imageData);
+
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        body: params,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
+
+      const text = await res.text();
+
+      if (text.includes('Success')) {
+        showToast(`✓ บันทึก${typeLabel}สำเร็จ!`, 'success');
+        addHistory(name, typeLabel, 'success');
+        // Save name for convenience
+        localStorage.setItem('saved_name', name);
+      } else {
+        throw new Error(text);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('❌ เกิดข้อผิดพลาด: ' + err.message.slice(0, 50), 'error');
+      addHistory(name, typeLabel, 'error');
+    } finally {
+      submitBtn.disabled = false;
+      btnLabel.style.display = 'inline';
+      spinner.style.display = 'none';
+    }
+  }
+
+  // ============================================================
+  // HISTORY
+  // ============================================================
+  function addHistory(name, type, status) {
+    const item = {
+      name, type, status,
+      time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+      date: new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })
+    };
+    history.unshift(item);
+    if (history.length > 20) history.pop();
+    localStorage.setItem('checkin_history', JSON.stringify(history));
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const list = document.getElementById('history-list');
+    if (!history.length) {
+      list.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:13px;padding:16px 0">ยังไม่มีประวัติ</div>';
+      return;
+    }
+    list.innerHTML = history.map(item => `
+      <div class="history-item">
+        <span class="history-badge ${item.type === 'เข้างาน' ? 'badge-in' : 'badge-out'}">${item.type}</span>
+        <div class="history-info">
+          <div class="history-name">${escapeHTML(item.name)}</div>
+          <div class="history-time">${item.date} · ${item.time}</div>
+        </div>
+        <span class="history-status ${item.status === 'error' ? 'err' : ''}">${item.status === 'success' ? '✓ สำเร็จ' : '✗ ผิดพลาด'}</span>
+      </div>
+    `).join('');
+  }
+
+  function clearHistory() {
+    history = [];
+    localStorage.removeItem('checkin_history');
+    renderHistory();
+  }
+
+  function escapeHTML(str) {
+    return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  // ============================================================
+  // TOAST
+  // ============================================================
+  let toastTimer;
+  function showToast(msg, type = 'success') {
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toast-msg');
+    clearTimeout(toastTimer);
+    toastMsg.textContent = msg;
+    toast.className = 'show ' + (type === 'error' ? 'error' : type === 'success' ? 'success' : '');
+    toastTimer = setTimeout(() => { toast.className = ''; }, 3000);
+  }
+
+  // ============================================================
+  // SETTINGS
+  // ============================================================
+  function openSettings() {
+    document.getElementById('gas-url-input').value = GAS_URL;
+    document.getElementById('saved-name-input').value = localStorage.getItem('saved_name') || '';
+    document.getElementById('settings-modal').classList.add('open');
+  }
+
+  function closeSettings() {
+    document.getElementById('settings-modal').classList.remove('open');
+  }
+
+  function saveSettings() {
+    GAS_URL = document.getElementById('gas-url-input').value.trim();
+    const savedName = document.getElementById('saved-name-input').value.trim();
+    localStorage.setItem('gas_url', GAS_URL);
+    if (savedName) {
+      localStorage.setItem('saved_name', savedName);
+      document.getElementById('name-input').value = savedName;
+    }
+    closeSettings();
+    showToast('✓ บันทึกการตั้งค่าแล้ว', 'success');
+  }
+
+  // Click outside to close settings
+  document.getElementById('settings-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeSettings();
+  });
+
+  // ============================================================
+  // INIT
+  // ============================================================
+  window.addEventListener('load', () => {
+    startCamera();
+    renderHistory();
+
+    // Restore saved name
+    const savedName = localStorage.getItem('saved_name');
+    if (savedName) document.getElementById('name-input').value = savedName;
+
+    // Prompt settings if no URL
+    if (!GAS_URL) {
+      setTimeout(openSettings, 800);
+    }
+
+    // Initial type setup
+    setType('in');
+  });
+</script>
 </body>
 </html>
