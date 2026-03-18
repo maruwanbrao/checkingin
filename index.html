@@ -718,7 +718,7 @@
   let stream = null;
   let capturedImageBase64 = null;
   let selectedDeviceId = localStorage.getItem('camera_device_id') || '';
-  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbyihE_pRLi6TB9dxh053sEWBKEwsNLi3s9eP-fCuKEwl32u9fo2exnlj4_ErTUObPun/exec';
+  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbxjBOE92klJt_u-s9Ozbsy37Eo9mMAwqA7bLHWUwNq499OtLelSnFOT4OqkatcqWqKz/exec';
   let SHEET_NAME = localStorage.getItem('sheet_name') || 'Employee checking in';
   let history = JSON.parse(localStorage.getItem('checkin_history') || '[]');
 
@@ -932,17 +932,13 @@
     const imageData = capturedImageBase64 || '';
 
     try {
-      // Apps Script (deployed as "Anyone") returns CORS headers, so we can read the response.
-      // Send as URLSearchParams so e.parameter works correctly in Apps Script.
-      const params = new URLSearchParams();
-      params.append('name', name);
-      params.append('type', typeLabel);
-      params.append('image', imageData);
+      // ส่งเป็น JSON body — Apps Script จะรับผ่าน e.postData.contents
+      const payload = JSON.stringify({ name: name, type: typeLabel, image: imageData });
 
       const res = await fetch(GAS_URL, {
         method: 'POST',
-        body: params,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: payload,
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         redirect: 'follow'
       });
 
