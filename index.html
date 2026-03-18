@@ -676,7 +676,7 @@
   let currentType = 'in';
   let stream = null;
   let capturedImageBase64 = null;
-  let GAS_URL = localStorage.getItem('gas_url') || '';
+  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbxdsGB5sh0iOdlwI1b8wRM2Xe85hBAomgFkwzD40Ksu-uyhC4BEyqwnk3Cqpc9kYg38/exec';
   let history = JSON.parse(localStorage.getItem('checkin_history') || '[]');
 
   // ============================================================
@@ -960,7 +960,7 @@
     const savedName = localStorage.getItem('saved_name');
     if (savedName) document.getElementById('name-input').value = savedName;
 
-    // Prompt settings if no URL
+    // Prompt settings only if URL was manually cleared
     if (!GAS_URL) {
       setTimeout(openSettings, 800);
     }
