@@ -694,27 +694,46 @@
   // CAMERA
   // ============================================================
   async function startCamera() {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
-      });
-      const video = document.getElementById('video-feed');
-      video.srcObject = stream;
-      video.style.display = 'block';
-      document.getElementById('captured-img').style.display = 'none';
-      document.getElementById('cam-status').style.display = 'flex';
-    } catch (err) {
-      console.warn('Camera error:', err);
-      // Show placeholder
-      const frame = document.getElementById('camera-frame');
-      frame.innerHTML += `
-        <div class="camera-placeholder">
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    const video = document.getElementById('video-feed');
+    const frame = document.getElementById('camera-frame');
+    const oldPH = frame.querySelector('.camera-placeholder');
+    if (oldPH) oldPH.remove();
+
+    const attempts = [
+      { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: { exact: 'user' } } },
+      { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } },
+      { video: { width: { ideal: 640 }, height: { ideal: 480 } } },
+      { video: true }
+    ];
+
+    let started = false;
+    for (const c of attempts) {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia(c);
+        const label = (s.getVideoTracks()[0]?.label || '').toLowerCase();
+        const isVirtual = ['virtual','obs','snap camera','manycam','droidcam','iriun'].some(k => label.includes(k));
+        if (isVirtual) { s.getTracks().forEach(t => t.stop()); continue; }
+        stream = s;
+        video.srcObject = stream;
+        video.style.display = 'block';
+        document.getElementById('captured-img').style.display = 'none';
+        document.getElementById('cam-status').style.display = 'flex';
+        started = true;
+        break;
+      } catch(e) { console.warn('Camera attempt:', e.message); }
+    }
+
+    if (!started) {
+      video.style.display = 'none';
+      frame.insertAdjacentHTML('beforeend', `
+        <div class="camera-placeholder" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-dim)">
           <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
             <circle cx="12" cy="13" r="4"/>
           </svg>
-          <span style="font-size:13px">ไม่สามารถเข้าถึงกล้องได้<br>กดถ่ายรูปเพื่อลองอีกครั้ง</span>
-        </div>`;
+          <span style="font-size:13px;text-align:center">กรุณาอนุญาตการใช้กล้อง<br>แล้วกดปุ่มกล้องเพื่อลองอีกครั้ง</span>
+        </div>`);
     }
   }
 
@@ -831,30 +850,27 @@
     const imageData = capturedImageBase64 || '';
 
     try {
-      const params = new URLSearchParams();
-      params.append('name', name);
-      params.append('type', typeLabel);
-      params.append('image', imageData);
+      // GitHub Pages -> Google Apps Script requires no-cors mode.
+      // Apps Script receives FormData as e.parameter correctly.
+      // Since no-cors returns opaque response (unreadable), any non-throw = sent successfully.
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('type', typeLabel);
+      formData.append('image', imageData);
 
-      const res = await fetch(GAS_URL, {
+      await fetch(GAS_URL, {
         method: 'POST',
-        body: params,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        body: formData,
+        mode: 'no-cors'
       });
 
-      const text = await res.text();
+      showToast(`✓ บันทึก${typeLabel}สำเร็จ!`, 'success');
+      addHistory(name, typeLabel, 'success');
+      localStorage.setItem('saved_name', name);
 
-      if (text.includes('Success')) {
-        showToast(`✓ บันทึก${typeLabel}สำเร็จ!`, 'success');
-        addHistory(name, typeLabel, 'success');
-        // Save name for convenience
-        localStorage.setItem('saved_name', name);
-      } else {
-        throw new Error(text);
-      }
     } catch (err) {
       console.error(err);
-      showToast('❌ เกิดข้อผิดพลาด: ' + err.message.slice(0, 50), 'error');
+      showToast('❌ ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่', 'error');
       addHistory(name, typeLabel, 'error');
     } finally {
       submitBtn.disabled = false;
