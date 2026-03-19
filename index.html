@@ -557,6 +557,39 @@
     .history-status { font-size: 12px; color: var(--accent-in); flex-shrink: 0; }
     .history-status.err { color: var(--accent-out); }
 
+    /* ===== STATUS BAR ===== */
+    .status-bar {
+      display: flex;
+      gap: 8px;
+      padding: 12px 24px 0;
+    }
+    .status-chip {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-dim);
+      transition: all 0.3s;
+    }
+    .status-chip.done-in  { background: var(--glow-in);  color: var(--accent-in);  border-color: rgba(0,229,160,0.3); }
+    .status-chip.done-out { background: var(--glow-out); color: var(--accent-out); border-color: rgba(255,77,109,0.3); }
+    .status-chip.loading  { opacity: 0.5; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+    .submit-btn:disabled {
+      opacity: 0.38 !important;
+      cursor: not-allowed !important;
+      transform: none !important;
+      filter: none !important;
+    }
+
     /* ===== EMPLOYEE SELECT ===== */
     .employee-select {
       width: 100%;
@@ -658,6 +691,18 @@
       </button>
     </div>
 
+    <!-- Status Bar -->
+    <div class="status-bar" id="status-bar" style="display:none">
+      <div class="status-chip loading" id="chip-in">
+        <div class="status-dot"></div>
+        <span id="chip-in-text">Check-in</span>
+      </div>
+      <div class="status-chip loading" id="chip-out">
+        <div class="status-dot"></div>
+        <span id="chip-out-text">Check-out</span>
+      </div>
+    </div>
+
     <!-- Camera -->
     <div class="camera-section">
       <div class="camera-frame" id="camera-frame">
@@ -693,7 +738,7 @@
       <div>
         <div class="field-label">เลือกพนักงาน</div>
         <div class="select-wrap">
-          <select class="employee-select" id="name-input">
+          <select class="employee-select" id="name-input" onchange="onEmployeeChange()">
             <option value="">— กรุณาเลือกชื่อ —</option>
             <option value="Mr. Myo Thiha (Mo)">Mr. Myo Thiha (Mo)</option>
             <option value="Ms. Aree Songchansitto (Ann)">Ms. Aree Songchansitto (Ann)</option>
@@ -755,7 +800,7 @@
   let stream = null;
   let capturedImageBase64 = null;
   let selectedDeviceId = localStorage.getItem('camera_device_id') || '';
-  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbxjBOE92klJt_u-s9Ozbsy37Eo9mMAwqA7bLHWUwNq499OtLelSnFOT4OqkatcqWqKz/exec';
+  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbweYNwAxVWBVT6EMKcgJZ74Jq5yCoj8VO1WhzszTdykVmwTP80kqFJFEMG7iwbolgFf/exec';
   let SHEET_NAME = localStorage.getItem('sheet_name') || 'Employee checking in';
   let history = JSON.parse(localStorage.getItem('checkin_history') || '[]');
 
@@ -958,6 +1003,7 @@
         el.className = el.className.replace('corner-in', 'corner-out');
       });
     }
+    updateSubmitButton();
   }
 
   // Fix corner IDs (simpler approach)
@@ -968,6 +1014,81 @@
       el.id = ids[i];
     });
   });
+
+  // ============================================================
+  // CHECK STATUS (เช็คสถานะวันนี้ของพนักงานจาก Sheet)
+  // ============================================================
+  let todayStatus = { checkin: false, checkout: false };
+  let statusCheckTimeout = null;
+
+  async function checkEmployeeStatus(name) {
+    if (!name || !GAS_URL) return;
+
+    const bar = document.getElementById('status-bar');
+    const chipIn  = document.getElementById('chip-in');
+    const chipOut = document.getElementById('chip-out');
+    const chipInTxt  = document.getElementById('chip-in-text');
+    const chipOutTxt = document.getElementById('chip-out-text');
+
+    bar.style.display = 'flex';
+    chipIn.className  = 'status-chip loading';
+    chipOut.className = 'status-chip loading';
+    chipInTxt.textContent  = 'กำลังตรวจสอบ...';
+    chipOutTxt.textContent = 'กำลังตรวจสอบ...';
+
+    try {
+      const url = GAS_URL + '?action=status&name=' + encodeURIComponent(name);
+      const res = await fetch(url, { method: 'GET', redirect: 'follow' });
+      const text = await res.text();
+      const data = JSON.parse(text);
+      todayStatus = data;
+    } catch (err) {
+      console.warn('checkEmployeeStatus error:', err);
+      // ถ้าเช็คไม่ได้ ให้ผ่านไปก่อน
+      todayStatus = { checkin: false, checkout: false };
+    }
+
+    // อัปเดต UI chip
+    chipIn.className  = todayStatus.checkin  ? 'status-chip done-in'  : 'status-chip';
+    chipOut.className = todayStatus.checkout ? 'status-chip done-out' : 'status-chip';
+    chipInTxt.textContent  = todayStatus.checkin  ? '✓ Check-in แล้ว'  : 'ยังไม่ Check-in';
+    chipOutTxt.textContent = todayStatus.checkout ? '✓ Check-out แล้ว' : 'ยังไม่ Check-out';
+
+    // อัปเดตปุ่มบันทึก
+    updateSubmitButton();
+  }
+
+  function updateSubmitButton() {
+    const submitBtn = document.getElementById('submit-btn');
+    const btnLabel  = document.getElementById('btn-label');
+    const name = document.getElementById('name-input').value.trim();
+
+    if (!name) {
+      submitBtn.disabled = false;
+      return;
+    }
+
+    if (currentType === 'in') {
+      if (todayStatus.checkin) {
+        submitBtn.disabled = true;
+        btnLabel.textContent = '✓ Check-in วันนี้แล้ว';
+      } else {
+        submitBtn.disabled = false;
+        btnLabel.textContent = '✓ บันทึกเข้างาน';
+      }
+    } else {
+      if (todayStatus.checkout) {
+        submitBtn.disabled = true;
+        btnLabel.textContent = '✓ Check-out วันนี้แล้ว';
+      } else if (!todayStatus.checkin) {
+        submitBtn.disabled = true;
+        btnLabel.textContent = '⚠ ยังไม่ได้ Check-in';
+      } else {
+        submitBtn.disabled = false;
+        btnLabel.textContent = '✕ บันทึกออกงาน';
+      }
+    }
+  }
 
   // ============================================================
   // SUBMIT
@@ -985,21 +1106,34 @@
       return;
     }
 
-    // UI loading state
+    const typeLabel = currentType === 'in' ? 'เข้างาน' : 'ออกงาน';
+
+    // ── ตรวจสอบฝั่ง client ก่อน ──────────────────────────────────
+    if (typeLabel === 'เข้างาน' && todayStatus.checkin) {
+      showToast('⚠️ ' + name.split('(')[1]?.replace(')','') + ' Check-in วันนี้แล้ว', 'error');
+      return;
+    }
+    if (typeLabel === 'ออกงาน' && todayStatus.checkout) {
+      showToast('⚠️ ' + name.split('(')[1]?.replace(')','') + ' Check-out วันนี้แล้ว', 'error');
+      return;
+    }
+    if (typeLabel === 'ออกงาน' && !todayStatus.checkin) {
+      showToast('⚠️ ยังไม่ได้ Check-in วันนี้', 'error');
+      return;
+    }
+
+    // UI loading
     const submitBtn = document.getElementById('submit-btn');
-    const btnLabel = document.getElementById('btn-label');
-    const spinner = document.getElementById('spinner');
+    const btnLabel  = document.getElementById('btn-label');
+    const spinner   = document.getElementById('spinner');
     submitBtn.disabled = true;
     btnLabel.style.display = 'none';
     spinner.style.display = 'block';
 
-    const typeLabel = currentType === 'in' ? 'เข้างาน' : 'ออกงาน';
     const imageData = capturedImageBase64 || '';
 
     try {
-      // ส่งเป็น JSON body — Apps Script จะรับผ่าน e.postData.contents
-      const payload = JSON.stringify({ name: name, type: typeLabel, image: imageData });
-
+      const payload = JSON.stringify({ name, type: typeLabel, image: imageData });
       const res = await fetch(GAS_URL, {
         method: 'POST',
         body: payload,
@@ -1011,14 +1145,33 @@
       console.log('Apps Script response:', text);
 
       if (text.startsWith('Success')) {
-        // Response format: "Success|https://drive.google.com/..."
-        const parts = text.split('|');
-        const driveLink = parts[1] || '';
-        showToast(`✓ บันทึก${typeLabel}สำเร็จ!`, 'success');
+        const driveLink = text.split('|')[1] || '';
+        const nickname = name.match(/\(([^)]+)\)/)?.[1] || name;
+        showToast(`✓ ${nickname} ${typeLabel}สำเร็จ!`, 'success');
         addHistory(name, typeLabel, 'success', driveLink);
         localStorage.setItem('saved_name', name);
+
+        // อัปเดตสถานะทันที
+        if (typeLabel === 'เข้างาน')  todayStatus.checkin  = true;
+        if (typeLabel === 'ออกงาน') todayStatus.checkout = true;
+
+        // อัปเดต chips
+        const chipIn  = document.getElementById('chip-in');
+        const chipOut = document.getElementById('chip-out');
+        if (typeLabel === 'เข้างาน') {
+          chipIn.className = 'status-chip done-in';
+          document.getElementById('chip-in-text').textContent = '✓ Check-in แล้ว';
+        } else {
+          chipOut.className = 'status-chip done-out';
+          document.getElementById('chip-out-text').textContent = '✓ Check-out แล้ว';
+        }
+
+      } else if (text.startsWith('Duplicate')) {
+        showToast('⚠️ ' + text.replace('Duplicate: ',''), 'error');
+      } else if (text.startsWith('NoCheckin')) {
+        showToast('⚠️ ยังไม่ได้ Check-in วันนี้', 'error');
       } else {
-        throw new Error(text || 'ไม่ได้รับการตอบกลับจากเซิร์ฟเวอร์');
+        throw new Error(text || 'ไม่ได้รับการตอบกลับ');
       }
     } catch (err) {
       console.error('Submit error:', err);
@@ -1028,6 +1181,19 @@
       submitBtn.disabled = false;
       btnLabel.style.display = 'inline';
       spinner.style.display = 'none';
+      updateSubmitButton();
+    }
+  }
+
+  function onEmployeeChange() {
+    todayStatus = { checkin: false, checkout: false };
+    updateSubmitButton();
+    const name = document.getElementById('name-input').value.trim();
+    if (name) {
+      clearTimeout(statusCheckTimeout);
+      statusCheckTimeout = setTimeout(() => checkEmployeeStatus(name), 400);
+    } else {
+      document.getElementById('status-bar').style.display = 'none';
     }
   }
 
@@ -1124,12 +1290,16 @@
     await enumerateDevices();
     renderHistory();
 
-    // Restore last selected employee in dropdown
+    // Restore last selected employee and check status
     const savedName = localStorage.getItem('saved_name');
     if (savedName) {
       const sel = document.getElementById('name-input');
       for (let i = 0; i < sel.options.length; i++) {
-        if (sel.options[i].value === savedName) { sel.selectedIndex = i; break; }
+        if (sel.options[i].value === savedName) {
+          sel.selectedIndex = i;
+          checkEmployeeStatus(savedName);
+          break;
+        }
       }
     }
 
