@@ -583,11 +583,14 @@
     .status-chip.loading  { opacity: 0.5; }
     .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 
-    .submit-btn:disabled {
-      opacity: 0.38 !important;
+    .submit-btn:disabled,
+    .submit-btn[disabled] {
+      opacity: 0.35 !important;
       cursor: not-allowed !important;
       transform: none !important;
       filter: none !important;
+      pointer-events: none !important;
+      box-shadow: none !important;
     }
 
     /* ===== EMPLOYEE SELECT ===== */
@@ -933,10 +936,11 @@
     const sel = document.getElementById('camera-select');
     selectedDeviceId = sel.value;
     localStorage.setItem('camera_device_id', selectedDeviceId);
-    // Reset photo state
     capturedImageBase64 = null;
     document.getElementById('retake-btn').classList.remove('visible');
     document.getElementById('capture-btn').style.display = 'flex';
+    document.getElementById('photo-hint').style.display  = 'flex';
+    updateSubmitButton();
     await startCamera(selectedDeviceId);
   }
 
@@ -1015,7 +1019,6 @@
       frame.className = 'camera-frame active-in-border';
       captureBtn.className = 'capture-btn in-mode';
       submitBtn.className = 'submit-btn btn-in';
-      btnLabel.textContent = '✓ บันทึกเข้างาน';
       corners.forEach(id => {
         document.getElementById(id).className = `corner ${id.replace('corner-', 'corner-')} corner-in`;
       });
@@ -1025,7 +1028,6 @@
       frame.className = 'camera-frame active-out-border';
       captureBtn.className = 'capture-btn out-mode';
       submitBtn.className = 'submit-btn btn-out';
-      btnLabel.textContent = '✕ บันทึกออกงาน';
       corners.forEach(id => {
         const el = document.getElementById(id);
         el.className = el.className.replace('corner-in', 'corner-out');
@@ -1089,41 +1091,32 @@
   function updateSubmitButton() {
     const submitBtn = document.getElementById('submit-btn');
     const btnLabel  = document.getElementById('btn-label');
-    const name = document.getElementById('name-input').value.trim();
-    const hasPhoto = !!capturedImageBase64;
+    const name      = document.getElementById('name-input').value.trim();
+    const hasPhoto  = !!capturedImageBase64;
 
-    // ยังไม่ถ่ายรูป — ล็อคก่อนเลย
+    // helper: ตั้งค่าปุ่ม
+    function lock(text)   { submitBtn.disabled = true;  btnLabel.textContent = text; }
+    function unlock(text) { submitBtn.disabled = false; btnLabel.textContent = text; }
+
+    // ── ยังไม่ถ่ายรูป ────────────────────────────────────────────
     if (!hasPhoto) {
-      submitBtn.disabled = true;
-      btnLabel.textContent = currentType === 'in' ? '📷 ถ่ายรูปก่อนเข้างาน' : '📷 ถ่ายรูปก่อนออกงาน';
+      lock(currentType === 'in' ? '📷 ถ่ายรูปก่อนเข้างาน' : '📷 ถ่ายรูปก่อนออกงาน');
       return;
     }
 
+    // ── ยังไม่เลือกชื่อ ──────────────────────────────────────────
     if (!name) {
-      submitBtn.disabled = true;
-      btnLabel.textContent = currentType === 'in' ? '✓ บันทึกเข้างาน' : '✕ บันทึกออกงาน';
+      lock(currentType === 'in' ? '— เลือกชื่อพนักงาน —' : '— เลือกชื่อพนักงาน —');
       return;
     }
 
+    // ── มีรูป + มีชื่อ: ตรวจสถานะวันนี้ ─────────────────────────
     if (currentType === 'in') {
-      if (todayStatus.checkin) {
-        submitBtn.disabled = true;
-        btnLabel.textContent = '✓ Check-in วันนี้แล้ว';
-      } else {
-        submitBtn.disabled = false;
-        btnLabel.textContent = '✓ บันทึกเข้างาน';
-      }
+      todayStatus.checkin ? lock('✓ Check-in วันนี้แล้ว') : unlock('✓ บันทึกเข้างาน');
     } else {
-      if (todayStatus.checkout) {
-        submitBtn.disabled = true;
-        btnLabel.textContent = '✓ Check-out วันนี้แล้ว';
-      } else if (!todayStatus.checkin) {
-        submitBtn.disabled = true;
-        btnLabel.textContent = '⚠ ยังไม่ได้ Check-in';
-      } else {
-        submitBtn.disabled = false;
-        btnLabel.textContent = '✕ บันทึกออกงาน';
-      }
+      if (todayStatus.checkout)     lock('✓ Check-out วันนี้แล้ว');
+      else if (!todayStatus.checkin) lock('⚠ ต้อง Check-in ก่อน');
+      else                           unlock('✕ บันทึกออกงาน');
     }
   }
 
@@ -1167,7 +1160,12 @@
     btnLabel.style.display = 'none';
     spinner.style.display = 'block';
 
-    const imageData = capturedImageBase64 || '';
+    // ตรวจ double-check ไม่ให้ผ่านหากยังไม่ถ่ายรูป
+    if (!capturedImageBase64) {
+      showToast('📷 กรุณาถ่ายรูปก่อนบันทึก', 'error');
+      return;
+    }
+    const imageData = capturedImageBase64;
 
     try {
       const payload = JSON.stringify({ name, type: typeLabel, image: imageData });
