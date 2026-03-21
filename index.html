@@ -987,6 +987,20 @@
   // ============================================================
   function setType(type) {
     currentType = type;
+
+    // Reset รูปทุกครั้งที่สลับ เข้างาน/ออกงาน
+    if (capturedImageBase64) {
+      capturedImageBase64 = null;
+      const video = document.getElementById('video-feed');
+      const img   = document.getElementById('captured-img');
+      video.style.display = 'block';
+      img.style.display   = 'none';
+      document.getElementById('cam-status').style.display = 'flex';
+      document.getElementById('retake-btn').classList.remove('visible');
+      document.getElementById('capture-btn').style.display = 'flex';
+      document.getElementById('photo-hint').style.display  = 'flex';
+    }
+
     const btnIn = document.getElementById('btn-checkin');
     const btnOut = document.getElementById('btn-checkout');
     const frame = document.getElementById('camera-frame');
