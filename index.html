@@ -664,6 +664,199 @@
       .form-section { padding: 0 16px 16px; }
       .logo-text { font-size: 16px; }
     }
+
+    /* ===== SUCCESS POPUP ===== */
+    #success-popup {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      pointer-events: none;
+      opacity: 0;
+    }
+    #success-popup.show {
+      pointer-events: all;
+      animation: popupFadeIn 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    }
+    #success-popup.hide {
+      animation: popupFadeOut 0.3s ease forwards;
+    }
+    @keyframes popupFadeIn {
+      from { opacity:0; transform: scale(0.85); }
+      to   { opacity:1; transform: scale(1); }
+    }
+    @keyframes popupFadeOut {
+      from { opacity:1; transform: scale(1); }
+      to   { opacity:0; transform: scale(0.9); }
+    }
+
+    .popup-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(12px);
+    }
+
+    .popup-card {
+      position: relative;
+      width: 100%;
+      max-width: 360px;
+      background: var(--card);
+      border-radius: 28px;
+      padding: 36px 28px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+    }
+
+    /* Glow ring behind icon */
+    .popup-glow {
+      position: absolute;
+      top: -60px; left: 50%;
+      transform: translateX(-50%);
+      width: 260px; height: 260px;
+      border-radius: 50%;
+      opacity: 0.18;
+      filter: blur(40px);
+    }
+    .popup-glow.glow-in  { background: var(--accent-in); }
+    .popup-glow.glow-out { background: var(--accent-out); }
+
+    /* Confetti particles */
+    .popup-particles {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .particle {
+      position: absolute;
+      width: 7px; height: 7px;
+      border-radius: 2px;
+      opacity: 0;
+      animation: particleFly 1.2s ease forwards;
+    }
+    @keyframes particleFly {
+      0%   { transform: translate(0,0) rotate(0deg) scale(1); opacity:1; }
+      100% { transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) scale(0.2); opacity:0; }
+    }
+
+    /* Check / X icon circle */
+    .popup-icon-wrap {
+      width: 88px; height: 88px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px;
+      position: relative;
+    }
+    .popup-icon-wrap.icon-in  { background: var(--glow-in);  border: 2px solid var(--accent-in); }
+    .popup-icon-wrap.icon-out { background: var(--glow-out); border: 2px solid var(--accent-out); }
+
+    .popup-icon-svg {
+      animation: iconPop 0.5s cubic-bezier(0.34,1.8,0.64,1) 0.15s both;
+    }
+    @keyframes iconPop {
+      from { transform: scale(0) rotate(-20deg); opacity: 0; }
+      to   { transform: scale(1) rotate(0deg);   opacity: 1; }
+    }
+
+    /* Ripple ring */
+    .popup-ring {
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      animation: ringPulse 1.4s ease-out 0.2s infinite;
+      opacity: 0;
+    }
+    .popup-icon-wrap.icon-in  .popup-ring { color: var(--accent-in); }
+    .popup-icon-wrap.icon-out .popup-ring { color: var(--accent-out); }
+    @keyframes ringPulse {
+      0%   { transform: scale(1);   opacity: 0.6; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+
+    .popup-type {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      animation: slideUp 0.4s ease 0.2s both;
+    }
+    .popup-type.type-in  { color: var(--accent-in); }
+    .popup-type.type-out { color: var(--accent-out); }
+
+    .popup-name {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text);
+      text-align: center;
+      margin-bottom: 6px;
+      animation: slideUp 0.4s ease 0.28s both;
+    }
+
+    .popup-msg {
+      font-size: 15px;
+      color: var(--text-dim);
+      margin-bottom: 24px;
+      animation: slideUp 0.4s ease 0.34s both;
+    }
+
+    .popup-time {
+      font-family: 'Space Mono', monospace;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+      animation: slideUp 0.4s ease 0.4s both;
+    }
+
+    .popup-date {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 28px;
+      animation: slideUp 0.4s ease 0.44s both;
+    }
+
+    .popup-close {
+      width: 100%;
+      padding: 14px;
+      border-radius: 14px;
+      border: none;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      animation: slideUp 0.4s ease 0.5s both;
+    }
+    .popup-close.close-in  { background: linear-gradient(135deg,#00c87a,#00e5a0); color:#001a10; box-shadow: 0 8px 24px var(--glow-in); }
+    .popup-close.close-out { background: linear-gradient(135deg,#e0304f,#ff4d6d); color:#fff;    box-shadow: 0 8px 24px var(--glow-out); }
+    .popup-close:hover { transform: translateY(-2px); filter: brightness(1.06); }
+    .popup-close:active { transform: translateY(0); }
+
+    @keyframes slideUp {
+      from { opacity:0; transform: translateY(14px); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+
+    /* Photo thumbnail in popup */
+    .popup-photo {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid var(--border);
+      margin-bottom: 14px;
+      animation: slideUp 0.4s ease 0.22s both;
+    }
   </style>
 </head>
 <body>
@@ -779,6 +972,26 @@
       <button class="clear-btn" onclick="clearHistory()">ลบทั้งหมด</button>
     </div>
     <div id="history-list"></div>
+  </div>
+
+  <!-- Success Popup -->
+  <div id="success-popup">
+    <div class="popup-backdrop" onclick="closeSuccessPopup()"></div>
+    <div class="popup-card" id="popup-card">
+      <div class="popup-glow" id="popup-glow"></div>
+      <div class="popup-particles" id="popup-particles"></div>
+      <img class="popup-photo" id="popup-photo" src="" alt="" style="display:none" />
+      <div class="popup-icon-wrap" id="popup-icon-wrap">
+        <div class="popup-ring"></div>
+        <svg class="popup-icon-svg" id="popup-icon-svg" width="44" height="44" viewBox="0 0 44 44" fill="none"></svg>
+      </div>
+      <div class="popup-type" id="popup-type-label"></div>
+      <div class="popup-name" id="popup-name-label"></div>
+      <div class="popup-msg"  id="popup-msg-label"></div>
+      <div class="popup-time" id="popup-time-label"></div>
+      <div class="popup-date" id="popup-date-label"></div>
+      <button class="popup-close" id="popup-close-btn" onclick="closeSuccessPopup()">ตกลง</button>
+    </div>
   </div>
 
   <!-- Toast -->
@@ -1182,7 +1395,6 @@
       if (text.startsWith('Success')) {
         const driveLink = text.split('|')[1] || '';
         const nickname = name.match(/\(([^)]+)\)/)?.[1] || name;
-        showToast(`✓ ${nickname} ${typeLabel}สำเร็จ!`, 'success');
         addHistory(name, typeLabel, 'success', driveLink);
         localStorage.setItem('saved_name', name);
 
@@ -1201,6 +1413,9 @@
           document.getElementById('chip-out-text').textContent = '✓ Check-out แล้ว';
         }
 
+        // แสดง success popup
+        showSuccessPopup(nickname, typeLabel, capturedImageBase64);
+
       } else if (text.startsWith('Duplicate')) {
         showToast('⚠️ ' + text.replace('Duplicate: ',''), 'error');
       } else if (text.startsWith('NoCheckin')) {
@@ -1217,6 +1432,103 @@
       btnLabel.style.display = 'inline';
       spinner.style.display = 'none';
       updateSubmitButton();
+    }
+  }
+
+  // ============================================================
+  // SUCCESS POPUP
+  // ============================================================
+  function showSuccessPopup(nickname, typeLabel, photoBase64) {
+    const isIn   = typeLabel === 'เข้างาน';
+    const now    = new Date();
+    const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = now.toLocaleDateString('th-TH', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    });
+
+    // ── ตั้งค่า elements ────────────────────────────────────────
+    const wrap   = document.getElementById('popup-icon-wrap');
+    const glow   = document.getElementById('popup-glow');
+    const svgEl  = document.getElementById('popup-icon-svg');
+    const typeEl = document.getElementById('popup-type-label');
+    const nameEl = document.getElementById('popup-name-label');
+    const msgEl  = document.getElementById('popup-msg-label');
+    const timeEl = document.getElementById('popup-time-label');
+    const dateEl = document.getElementById('popup-date-label');
+    const closeBtn = document.getElementById('popup-close-btn');
+    const photoEl  = document.getElementById('popup-photo');
+
+    wrap.className   = isIn ? 'popup-icon-wrap icon-in' : 'popup-icon-wrap icon-out';
+    glow.className   = isIn ? 'popup-glow glow-in' : 'popup-glow glow-out';
+    typeEl.className = isIn ? 'popup-type type-in' : 'popup-type type-out';
+    closeBtn.className = isIn ? 'popup-close close-in' : 'popup-close close-out';
+
+    // icon SVG
+    svgEl.innerHTML = isIn
+      ? `<polyline points="8,22 18,32 36,14" stroke="#00e5a0" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`
+      : `<line x1="12" y1="12" x2="32" y2="32" stroke="#ff4d6d" stroke-width="4" stroke-linecap="round"/>
+         <line x1="32" y1="12" x2="12" y2="32" stroke="#ff4d6d" stroke-width="4" stroke-linecap="round"/>`;
+
+    typeEl.textContent = isIn ? '✦ CHECK IN ✦' : '✦ CHECK OUT ✦';
+    nameEl.textContent = nickname;
+    msgEl.textContent  = isIn ? 'บันทึกเข้างานสำเร็จแล้ว 🎉' : 'บันทึกออกงานสำเร็จแล้ว 👋';
+    timeEl.textContent = timeStr;
+    dateEl.textContent = dateStr;
+
+    // รูปถ่าย
+    if (photoBase64) {
+      photoEl.src = photoBase64;
+      photoEl.style.display = 'block';
+      photoEl.style.borderColor = isIn ? 'var(--accent-in)' : 'var(--accent-out)';
+    } else {
+      photoEl.style.display = 'none';
+    }
+
+    // ── สร้าง confetti ────────────────────────────────────────
+    spawnParticles(isIn);
+
+    // ── แสดง popup ────────────────────────────────────────────
+    const popup = document.getElementById('success-popup');
+    popup.style.opacity = '';
+    popup.className = 'show';
+
+    // ปิดอัตโนมัติหลัง 5 วินาที
+    clearTimeout(window._popupTimer);
+    window._popupTimer = setTimeout(closeSuccessPopup, 5000);
+  }
+
+  function closeSuccessPopup() {
+    clearTimeout(window._popupTimer);
+    const popup = document.getElementById('success-popup');
+    popup.className = 'hide';
+    setTimeout(() => { popup.className = ''; popup.style.opacity = '0'; }, 300);
+  }
+
+  function spawnParticles(isIn) {
+    const container = document.getElementById('popup-particles');
+    container.innerHTML = '';
+    const colors = isIn
+      ? ['#00e5a0','#00c87a','#4dffc8','#b3ffe4','#fff']
+      : ['#ff4d6d','#e0304f','#ff8fa3','#ffd6de','#fff'];
+    const cx = 180, cy = 120; // rough center of card
+    for (let i = 0; i < 30; i++) {
+      const el = document.createElement('div');
+      el.className = 'particle';
+      const angle = (Math.random() * 360) * Math.PI / 180;
+      const dist  = 80 + Math.random() * 140;
+      const tx    = Math.cos(angle) * dist;
+      const ty    = Math.sin(angle) * dist - 60;
+      const rot   = (Math.random() - 0.5) * 720;
+      el.style.cssText = `
+        left: ${cx + (Math.random()-0.5)*60}px;
+        top:  ${cy + (Math.random()-0.5)*40}px;
+        background: ${colors[Math.floor(Math.random()*colors.length)]};
+        --tx: ${tx}px; --ty: ${ty}px; --rot: ${rot}deg;
+        animation-delay: ${Math.random()*0.3}s;
+        animation-duration: ${0.9 + Math.random()*0.5}s;
+        border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
+      `;
+      container.appendChild(el);
     }
   }
 
