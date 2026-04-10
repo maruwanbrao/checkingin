@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Syn Pitarn Chonburi · ระบบเข้า-ออกงาน</title>
+  <title>Taptop · ระบบเข้า-ออกงาน</title>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <style>
     :root {
@@ -408,84 +408,7 @@
     .toast-icon { font-size: 18px; }
 
     /* ===== SETTINGS MODAL ===== */
-    .settings-icon {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      width: 36px; height: 36px;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-      transition: border-color 0.2s;
-      color: var(--text-dim);
-    }
-    .settings-icon:hover { border-color: var(--accent-blue); color: var(--text); }
-
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(8px);
-      z-index: 50;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
-    .modal-overlay.open { display: flex; }
-
-    .modal {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 28px;
-      width: 100%;
-      max-width: 420px;
-      box-shadow: 0 32px 80px rgba(0,0,0,0.6);
-    }
-
-    .modal-title {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .modal-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 20px;
-    }
-
-    .btn-secondary {
-      flex: 1;
-      padding: 12px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text-dim);
-      font-family: 'Sarabun', sans-serif;
-      font-size: 15px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn-secondary:hover { border-color: var(--text-dim); color: var(--text); }
-
-    .btn-primary {
-      flex: 1;
-      padding: 12px;
-      border-radius: 12px;
-      border: none;
-      background: var(--accent-blue);
-      color: #fff;
-      font-family: 'Sarabun', sans-serif;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn-primary:hover { filter: brightness(1.1); }
+    
 
     /* ===== HISTORY ===== */
     .history-section {
@@ -864,15 +787,11 @@
   <header>
     <div class="logo">
       <div class="logo-icon">⚡</div>
-      <div class="logo-text">Syn Pitarn<span>Chonburi</span></div>
+      <div class="logo-text">Tap<span>top</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="clock-badge"><span id="live-clock">--:--:--</span></div>
-      <div class="settings-icon" onclick="openSettings()" title="ตั้งค่า">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-        </svg>
-      </div>
+
     </div>
   </header>
 
@@ -997,21 +916,6 @@
   <!-- Toast -->
   <div id="toast"><span class="toast-icon" id="toast-icon">✓</span><span id="toast-msg">บันทึกสำเร็จ</span></div>
 
-  <!-- Settings Modal -->
-  <div class="modal-overlay" id="settings-modal">
-    <div class="modal">
-      <div class="modal-title">
-        ⚙️ ตั้งค่าระบบ
-      </div>
-      <div>
-        <div class="field-label">Google Apps Script URL</div>
-        <input type="url" class="text-input" id="gas-url-input" placeholder="https://script.google.com/macros/s/..." style="margin-top:6px" />
-      </div>
-      <div style="margin-top:14px">
-        <div class="field-label">ชื่อ Sheet (ใน Google Sheets)</div>
-        <input type="text" class="text-input" id="sheet-name-input" placeholder="Employee checking in" style="margin-top:6px" />
-        <div style="font-size:11px;color:var(--text-dim);margin-top:5px">ต้องตรงกับชื่อ Tab ใน Google Sheets ทุกตัวอักษร</div>
-      </div>
 
       <div class="modal-actions">
         <button class="btn-secondary" onclick="closeSettings()">ยกเลิก</button>
@@ -1029,7 +933,6 @@
   let capturedImageBase64 = null;
   let selectedDeviceId = localStorage.getItem('camera_device_id') || '';
   let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbzpgKdLvooDB0C5lmacQ5xzjTsOif16G1jgOc0txm0cvCex-QABje17l8tBF5uYfhkJ/exec';
-  let SHEET_NAME = localStorage.getItem('sheet_name') || 'Employee checking in';
   let history = JSON.parse(localStorage.getItem('checkin_history') || '[]');
 
   // ============================================================
@@ -1601,32 +1504,7 @@
     toastTimer = setTimeout(() => { toast.className = ''; }, 3000);
   }
 
-  // ============================================================
-  // SETTINGS
-  // ============================================================
-  function openSettings() {
-    document.getElementById('gas-url-input').value = GAS_URL;
-    document.getElementById('sheet-name-input').value = SHEET_NAME;
-    document.getElementById('settings-modal').classList.add('open');
-  }
 
-  function closeSettings() {
-    document.getElementById('settings-modal').classList.remove('open');
-  }
-
-  function saveSettings() {
-    GAS_URL = document.getElementById('gas-url-input').value.trim();
-    SHEET_NAME = document.getElementById('sheet-name-input').value.trim() || 'Employee checking in';
-    localStorage.setItem('gas_url', GAS_URL);
-    localStorage.setItem('sheet_name', SHEET_NAME);
-    closeSettings();
-    showToast('✓ บันทึกการตั้งค่าแล้ว', 'success');
-  }
-
-  // Click outside to close settings
-  document.getElementById('settings-modal').addEventListener('click', function(e) {
-    if (e.target === this) closeSettings();
-  });
 
   // ============================================================
   // INIT
