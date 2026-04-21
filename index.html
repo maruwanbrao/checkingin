@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Synpitarn Chonburi · ระบบเข้า-ออกงาน</title>
+  <title>Taptop · ระบบเข้า-ออกงาน</title>
+  <!-- face-api.js for face detection -->
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <style>
     :root {
@@ -577,6 +579,38 @@
       font-size: 12px;
     }
 
+    /* ===== FACE DETECTION ===== */
+    #face-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 3;
+    }
+    .face-status {
+      position: absolute;
+      bottom: 12px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.65);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      white-space: nowrap;
+      z-index: 4;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .face-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--text-dim);
+      transition: background 0.3s;
+    }
+    .face-dot.detected { background: var(--accent-in); animation: blink 1s infinite; }
+    .face-dot.loading  { background: var(--accent-blue); animation: blink 0.6s infinite; }
+
     /* ===== CANVAS (hidden) ===== */
     #snapshot-canvas { display: none; }
 
@@ -787,7 +821,7 @@
   <header>
     <div class="logo">
       <div class="logo-icon">⚡</div>
-      <div class="logo-text">Synpitarn<span>Chonburi</span></div>
+      <div class="logo-text">Tap<span>top</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="clock-badge"><span id="live-clock">--:--:--</span></div>
@@ -823,6 +857,7 @@
       <div class="camera-frame" id="camera-frame">
         <video id="video-feed" autoplay playsinline muted></video>
         <img id="captured-img" alt="ภาพถ่าย" />
+        <canvas id="face-canvas"></canvas>
         <div class="camera-overlay">
           <div class="corner corner-tl corner-in" id="corner-tl"></div>
           <div class="corner corner-tr corner-in" id="corner-tr"></div>
@@ -830,6 +865,10 @@
           <div class="corner corner-br corner-in" id="corner-br"></div>
           <div class="camera-status" id="cam-status">
             <div class="rec-dot"></div><span>LIVE</span>
+          </div>
+          <div class="face-status" id="face-status">
+            <div class="face-dot loading" id="face-dot"></div>
+            <span id="face-status-text">กำลังโหลด AI...</span>
           </div>
         </div>
       </div>
@@ -915,6 +954,12 @@
 
   <!-- Toast -->
   <div id="toast"><span class="toast-icon" id="toast-icon">✓</span><span id="toast-msg">บันทึกสำเร็จ</span></div>
+
+
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeSettings()">ยกเลิก</button>
+        <button class="btn-primary" onclick="saveSettings()">บันทึก</button>
+      </div>
     </div>
   </div>
 
@@ -926,8 +971,196 @@
   let stream = null;
   let capturedImageBase64 = null;
   let selectedDeviceId = localStorage.getItem('camera_device_id') || '';
-  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbzpgKdLvooDB0C5lmacQ5xzjTsOif16G1jgOc0txm0cvCex-QABje17l8tBF5uYfhkJ/exec';
+  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbweYNwAxVWBVT6EMKcgJZ74Jq5yCoj8VO1WhzszTdykVmwTP80kqFJFEMG7iwbolgFf/exec';
   let history = JSON.parse(localStorage.getItem('checkin_history') || '[]');
+
+  // ============================================================
+  // FACE DETECTION (face-api.js)
+  // ============================================================
+  let faceApiReady = false;
+  let faceDetectionLoop = null;
+  let faceDetected = false;
+
+  async function loadFaceApi() {
+    const statusText = document.getElementById('face-status-text');
+    const dot = document.getElementById('face-dot');
+    try {
+      // โหลด tiny face detector model จาก CDN
+      const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+      faceApiReady = true;
+      dot.className = 'face-dot';
+      statusText.textContent = 'ไม่พบใบหน้า';
+
+      // ถ้ากล้องพร้อมแล้ว เริ่ม detect เลย
+      const video = document.getElementById('video-feed');
+      if (stream && video.readyState >= 2) {
+        resizeFaceCanvas();
+        startFaceDetection();
+      }
+    } catch(e) {
+      console.warn('face-api load error:', e);
+      dot.className = 'face-dot';
+      statusText.textContent = 'AI ไม่พร้อม';
+      document.getElementById('face-status').style.display = 'none';
+    }
+  }
+
+  function resizeFaceCanvas() {
+    const video  = document.getElementById('video-feed');
+    const canvas = document.getElementById('face-canvas');
+    const frame  = document.getElementById('camera-frame');
+    canvas.width  = frame.clientWidth;
+    canvas.height = frame.clientHeight;
+  }
+
+  function startFaceDetection() {
+    if (faceDetectionLoop) cancelAnimationFrame(faceDetectionLoop);
+    detectFaceLoop();
+  }
+
+  function stopFaceDetection() {
+    if (faceDetectionLoop) cancelAnimationFrame(faceDetectionLoop);
+    faceDetectionLoop = null;
+    const canvas = document.getElementById('face-canvas');
+    if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  async function detectFaceLoop() {
+    const video  = document.getElementById('video-feed');
+    const canvas = document.getElementById('face-canvas');
+    if (!stream || !video || video.paused || video.ended || !faceApiReady) return;
+
+    const ctx = canvas.getContext('2d');
+    const cw = canvas.width, ch = canvas.height;
+    const vw = video.videoWidth  || cw;
+    const vh = video.videoHeight || ch;
+
+    // scale จาก video resolution → canvas size
+    const scaleX = cw / vw;
+    const scaleY = ch / vh;
+
+    try {
+      const detections = await faceapi.detectAllFaces(
+        video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.45 })
+      );
+
+      ctx.clearRect(0, 0, cw, ch);
+      const statusText = document.getElementById('face-status-text');
+      const dot = document.getElementById('face-dot');
+
+      if (detections && detections.length > 0) {
+        faceDetected = true;
+        dot.className = 'face-dot detected';
+        statusText.textContent = detections.length > 1
+          ? `พบ ${detections.length} ใบหน้า`
+          : 'พบใบหน้า ✓';
+
+        const typeColor = currentType === 'in' ? '#00e5a0' : '#ff4d6d';
+        const glowColor = currentType === 'in' ? 'rgba(0,229,160,0.25)' : 'rgba(255,77,109,0.25)';
+
+        detections.forEach(det => {
+          const b = det.box;
+          const x = b.x * scaleX;
+          const y = b.y * scaleY;
+          const w = b.width  * scaleX;
+          const h = b.height * scaleY;
+          const pad = 18;
+          const bx = x - pad, by = y - pad, bw = w + pad*2, bh = h + pad*2;
+          const r = Math.round(det.score * 100);
+
+          drawFaceBox(ctx, bx, by, bw, bh, typeColor, glowColor, r);
+        });
+      } else {
+        faceDetected = false;
+        dot.className = 'face-dot';
+        statusText.textContent = 'ไม่พบใบหน้า';
+      }
+    } catch(e) { /* skip frame */ }
+
+    faceDetectionLoop = requestAnimationFrame(detectFaceLoop);
+  }
+
+  function drawFaceBox(ctx, x, y, w, h, color, glow, score) {
+    const now = Date.now();
+    const pulse = 0.7 + Math.sin(now / 400) * 0.3;  // breathing effect
+    const cornerLen = Math.min(w, h) * 0.22;
+
+    // glow fill
+    ctx.save();
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 18 * pulse;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.15;
+    ctx.strokeRect(x, y, w, h);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // scan line animation
+    const scanY = y + (((now / 8) % h));
+    const grad = ctx.createLinearGradient(x, scanY - 20, x, scanY + 20);
+    grad.addColorStop(0,   'transparent');
+    grad.addColorStop(0.5, color + '55');
+    grad.addColorStop(1,   'transparent');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, scanY - 20, w, 40);
+
+    // corner brackets
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 12 * pulse;
+    ctx.lineCap = 'round';
+    const corners = [
+      [x,   y,   1,  1],
+      [x+w, y,   -1, 1],
+      [x,   y+h, 1,  -1],
+      [x+w, y+h, -1, -1],
+    ];
+    corners.forEach(([cx, cy, dx, dy]) => {
+      ctx.beginPath();
+      ctx.moveTo(cx + dx * cornerLen, cy);
+      ctx.lineTo(cx, cy);
+      ctx.lineTo(cx, cy + dy * cornerLen);
+      ctx.stroke();
+    });
+    ctx.restore();
+
+    // score badge
+    ctx.save();
+    ctx.font = 'bold 11px Space Mono, monospace';
+    const label = `FACE ${score}%`;
+    const tw = ctx.measureText(label).width;
+    const bx2 = x + w/2 - tw/2 - 6;
+    const by2 = y - 22;
+    ctx.fillStyle = color + 'cc';
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(bx2, by2, tw + 12, 18, 4)
+                  : ctx.rect(bx2, by2, tw + 12, 18);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.fillText(label, bx2 + 6, by2 + 13);
+    ctx.restore();
+
+    // center crosshair
+    const cx2 = x + w/2, cy2 = y + h/2;
+    const cLen = 10;
+    ctx.save();
+    ctx.strokeStyle = color + 'aa';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx2 - cLen, cy2); ctx.lineTo(cx2 + cLen, cy2);
+    ctx.moveTo(cx2, cy2 - cLen); ctx.lineTo(cx2, cy2 + cLen);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // หยุด face detection เมื่อถ่ายรูปแล้ว / เริ่มใหม่เมื่อ retake
+  window.addEventListener('resize', () => {
+    if (faceApiReady && stream) resizeFaceCanvas();
+  });
 
   // ============================================================
   // CLOCK
@@ -1015,6 +1248,11 @@
         document.getElementById('captured-img').style.display = 'none';
         document.getElementById('cam-status').style.display = 'flex';
         started = true;
+        // เริ่ม face detection หลัง video พร้อม
+        video.addEventListener('loadedmetadata', () => {
+          resizeFaceCanvas();
+          if (faceApiReady) startFaceDetection();
+        }, { once: true });
         break;
       } catch(err) {
         lastErr = err.name + ': ' + err.message;
@@ -1080,6 +1318,7 @@
     document.getElementById('retake-btn').classList.add('visible');
     document.getElementById('capture-btn').style.display = 'none';
 
+    stopFaceDetection();
     showToast('📸 ถ่ายรูปสำเร็จ', 'info');
     document.getElementById('photo-hint').style.display = 'none';
     updateSubmitButton();
@@ -1115,6 +1354,7 @@
       document.getElementById('photo-hint').style.display  = 'flex';
     }
 
+    if (faceApiReady && stream) startFaceDetection();
     const btnIn = document.getElementById('btn-checkin');
     const btnOut = document.getElementById('btn-checkout');
     const frame = document.getElementById('camera-frame');
@@ -1507,6 +1747,7 @@
     // First get permission, then enumerate devices for accurate labels
     await startCamera();
     await enumerateDevices();
+    loadFaceApi();  // โหลด AI model (background)
     renderHistory();
 
     // Restore last selected employee and check status
