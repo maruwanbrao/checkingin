@@ -1653,20 +1653,27 @@
       return;
     }
     if (!GAS_URL) {
-      showToast('⚙️ กรุณาตั้งค่า URL ก่อน', 'error');
-      openSettings();
+      showToast('⚙️ ไม่พบ URL ของ Apps Script', 'error');
+      return;
+    }
+
+    // ตรวจรูปก่อน (ก่อน disable ปุ่ม)
+    if (!capturedImageBase64) {
+      showToast('📷 กรุณาถ่ายรูปก่อนบันทึก', 'error');
       return;
     }
 
     const typeLabel = currentType === 'in' ? 'เข้างาน' : 'ออกงาน';
 
-    // ── ตรวจสอบฝั่ง client ก่อน ──────────────────────────────────
+    // ตรวจสอบสถานะฝั่ง client
     if (typeLabel === 'เข้างาน' && todayStatus.checkin) {
-      showToast('⚠️ ' + name.split('(')[1]?.replace(')','') + ' Check-in วันนี้แล้ว', 'error');
+      const nick = name.match(/\(([^)]+)\)/)?.[1] || name;
+      showToast('⚠️ ' + nick + ' Check-in วันนี้แล้ว', 'error');
       return;
     }
     if (typeLabel === 'ออกงาน' && todayStatus.checkout) {
-      showToast('⚠️ ' + name.split('(')[1]?.replace(')','') + ' Check-out วันนี้แล้ว', 'error');
+      const nick = name.match(/\(([^)]+)\)/)?.[1] || name;
+      showToast('⚠️ ' + nick + ' Check-out วันนี้แล้ว', 'error');
       return;
     }
     if (typeLabel === 'ออกงาน' && !todayStatus.checkin) {
@@ -1674,7 +1681,7 @@
       return;
     }
 
-    // UI loading
+    // UI loading state
     const submitBtn = document.getElementById('submit-btn');
     const btnLabel  = document.getElementById('btn-label');
     const spinner   = document.getElementById('spinner');
@@ -1682,11 +1689,6 @@
     btnLabel.style.display = 'none';
     spinner.style.display = 'block';
 
-    // ตรวจ double-check ไม่ให้ผ่านหากยังไม่ถ่ายรูป
-    if (!capturedImageBase64) {
-      showToast('📷 กรุณาถ่ายรูปก่อนบันทึก', 'error');
-      return;
-    }
     const imageData = capturedImageBase64;
 
     try {
@@ -1722,11 +1724,10 @@
           document.getElementById('chip-out-text').textContent = '✓ Check-out แล้ว';
         }
 
-        // แสดง success popup
         showSuccessPopup(nickname, typeLabel, capturedImageBase64);
 
       } else if (text.startsWith('Duplicate')) {
-        showToast('⚠️ ' + text.replace('Duplicate: ',''), 'error');
+        showToast('⚠️ ' + text.replace('Duplicate: ', ''), 'error');
       } else if (text.startsWith('NoCheckin')) {
         showToast('⚠️ ยังไม่ได้ Check-in วันนี้', 'error');
       } else {
