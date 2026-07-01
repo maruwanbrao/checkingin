@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>สินพิธาน ชลบุรี · ระบบเข้า-ออกงาน</title>
+  <title>สินพืธาน ชลบุรี · ระบบเข้า-ออกงาน</title>
   <!-- TensorFlow.js + BlazeFace model (ตรวจจับใบหน้าจริง ทุก browser) -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js"></script>
@@ -483,113 +483,6 @@
     .history-status { font-size: 12px; color: var(--accent-in); flex-shrink: 0; }
     .history-status.err { color: var(--accent-out); }
 
-    /* ===== MANAGE EMPLOYEES ===== */
-    .manage-emp-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      width: 100%;
-      max-width: 520px;
-      padding: 10px;
-      border-radius: 12px;
-      border: 1px dashed var(--border);
-      background: transparent;
-      color: var(--text-dim);
-      font-family: 'Sarabun', sans-serif;
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.2s;
-      margin-top: 6px;
-      position: relative;
-      z-index: 1;
-    }
-    .manage-emp-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
-
-    .emp-panel {
-      width: 100%;
-      max-width: 520px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      overflow: hidden;
-      position: relative;
-      z-index: 1;
-      display: none;
-    }
-    .emp-panel.open { display: block; }
-
-    .emp-panel-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border);
-      font-weight: 700;
-      font-size: 15px;
-    }
-    .emp-panel-close {
-      background: none; border: none; color: var(--text-dim);
-      font-size: 20px; cursor: pointer; line-height: 1;
-      padding: 0 4px;
-      transition: color 0.2s;
-    }
-    .emp-panel-close:hover { color: var(--accent-out); }
-
-    .emp-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
-
-    .emp-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 14px;
-      animation: slideIn 0.25s ease;
-    }
-    .emp-item-name { flex: 1; font-size: 14px; }
-    .emp-delete-btn {
-      background: none; border: none;
-      color: var(--text-dim); font-size: 16px; cursor: pointer;
-      padding: 2px 6px; border-radius: 6px;
-      transition: all 0.2s;
-    }
-    .emp-delete-btn:hover { background: var(--glow-out); color: var(--accent-out); }
-
-    .emp-add-row {
-      display: flex; gap: 8px;
-      padding: 0 16px 16px;
-    }
-    .emp-add-input {
-      flex: 1;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 14px;
-      color: var(--text);
-      font-family: 'Sarabun', sans-serif;
-      font-size: 14px;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    .emp-add-input:focus { border-color: var(--accent-blue); }
-    .emp-add-input::placeholder { color: var(--text-dim); }
-    .emp-add-confirm {
-      padding: 10px 16px;
-      border-radius: 10px;
-      border: none;
-      background: var(--accent-blue);
-      color: #fff;
-      font-family: 'Sarabun', sans-serif;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: filter 0.2s;
-    }
-    .emp-add-confirm:hover { filter: brightness(1.1); }
-
     /* ===== STATUS BAR ===== */
     .status-bar {
       display: flex;
@@ -1014,6 +907,11 @@
         <div class="select-wrap">
           <select class="employee-select" id="name-input" onchange="onEmployeeChange()">
             <option value="">— กรุณาเลือกชื่อ —</option>
+            <option value="Mr. Myo Thiha (Mo)">Mr. Myo Thiha (Mo)</option>
+            <option value="Ms. Aree Songchansitto (Ann)">Ms. Aree Songchansitto (Ann)</option>
+            <option value="Mr. Saw Kha Mu Htoo (Linn)">Mr. Saw Kha Mu Htoo (Linn)</option>
+            <option value="Ms. Paweena Pinnarong (New)">Ms. Paweena Pinnarong (New)</option>
+            <option value="Ms. Patama Pumipuk (Pat)">Ms. Patama Pumipuk (Pat)</option>
           </select>
           <span class="select-arrow">▼</span>
         </div>
@@ -1023,25 +921,6 @@
         <span id="btn-label">✓ บันทึกเข้างาน</span>
         <div class="spinner" id="spinner"></div>
       </button>
-    </div>
-  </div>
-
-  <!-- Manage Employees -->
-  <button class="manage-emp-btn" onclick="toggleEmpPanel()">
-    ➕ เพิ่ม / จัดการพนักงาน
-  </button>
-
-  <div class="emp-panel" id="emp-panel">
-    <div class="emp-panel-header">
-      <span>👥 รายชื่อพนักงาน</span>
-      <button class="emp-panel-close" onclick="toggleEmpPanel()">✕</button>
-    </div>
-    <div class="emp-list" id="emp-list"></div>
-    <div class="emp-add-row">
-      <input class="emp-add-input" id="emp-add-input"
-        placeholder="ชื่อพนักงานใหม่ เช่น Ms. Sara Lee (Sara)"
-        onkeydown="if(event.key==='Enter') addEmployee()" />
-      <button class="emp-add-confirm" onclick="addEmployee()">เพิ่ม</button>
     </div>
   </div>
 
@@ -1093,7 +972,7 @@
   let stream = null;
   let capturedImageBase64 = null;
   let selectedDeviceId = localStorage.getItem('camera_device_id') || '';
-  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbweYNwAxVWBVT6EMKcgJZ74Jq5yCoj8VO1WhzszTdykVmwTP80kqFJFEMG7iwbolgFf/exec';
+  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbw-eFZJl7Yzuuoc6KVsGErW4TlOdq53FXicHTD8kYYxH5fgwRm6SyGy-0tc-1eHDAMk/exec';
   let history = JSON.parse(localStorage.getItem('checkin_history') || '[]');
 
   // ============================================================
@@ -1653,27 +1532,20 @@
       return;
     }
     if (!GAS_URL) {
-      showToast('⚙️ ไม่พบ URL ของ Apps Script', 'error');
-      return;
-    }
-
-    // ตรวจรูปก่อน (ก่อน disable ปุ่ม)
-    if (!capturedImageBase64) {
-      showToast('📷 กรุณาถ่ายรูปก่อนบันทึก', 'error');
+      showToast('⚙️ กรุณาตั้งค่า URL ก่อน', 'error');
+      openSettings();
       return;
     }
 
     const typeLabel = currentType === 'in' ? 'เข้างาน' : 'ออกงาน';
 
-    // ตรวจสอบสถานะฝั่ง client
+    // ── ตรวจสอบฝั่ง client ก่อน ──────────────────────────────────
     if (typeLabel === 'เข้างาน' && todayStatus.checkin) {
-      const nick = name.match(/\(([^)]+)\)/)?.[1] || name;
-      showToast('⚠️ ' + nick + ' Check-in วันนี้แล้ว', 'error');
+      showToast('⚠️ ' + name.split('(')[1]?.replace(')','') + ' Check-in วันนี้แล้ว', 'error');
       return;
     }
     if (typeLabel === 'ออกงาน' && todayStatus.checkout) {
-      const nick = name.match(/\(([^)]+)\)/)?.[1] || name;
-      showToast('⚠️ ' + nick + ' Check-out วันนี้แล้ว', 'error');
+      showToast('⚠️ ' + name.split('(')[1]?.replace(')','') + ' Check-out วันนี้แล้ว', 'error');
       return;
     }
     if (typeLabel === 'ออกงาน' && !todayStatus.checkin) {
@@ -1681,7 +1553,7 @@
       return;
     }
 
-    // UI loading state
+    // UI loading
     const submitBtn = document.getElementById('submit-btn');
     const btnLabel  = document.getElementById('btn-label');
     const spinner   = document.getElementById('spinner');
@@ -1689,6 +1561,11 @@
     btnLabel.style.display = 'none';
     spinner.style.display = 'block';
 
+    // ตรวจ double-check ไม่ให้ผ่านหากยังไม่ถ่ายรูป
+    if (!capturedImageBase64) {
+      showToast('📷 กรุณาถ่ายรูปก่อนบันทึก', 'error');
+      return;
+    }
     const imageData = capturedImageBase64;
 
     try {
@@ -1724,10 +1601,11 @@
           document.getElementById('chip-out-text').textContent = '✓ Check-out แล้ว';
         }
 
+        // แสดง success popup
         showSuccessPopup(nickname, typeLabel, capturedImageBase64);
 
       } else if (text.startsWith('Duplicate')) {
-        showToast('⚠️ ' + text.replace('Duplicate: ', ''), 'error');
+        showToast('⚠️ ' + text.replace('Duplicate: ',''), 'error');
       } else if (text.startsWith('NoCheckin')) {
         showToast('⚠️ ยังไม่ได้ Check-in วันนี้', 'error');
       } else {
@@ -1842,99 +1720,6 @@
     }
   }
 
-  // ============================================================
-  // MANAGE EMPLOYEES
-  // ============================================================
-  // รายชื่อเริ่มต้น (ฝังในโค้ด)
-  const DEFAULT_EMPLOYEES = [
-    "Mr. Myo Thiha (Mo)",
-    "Ms. Aree Songchansitto (Ann)",
-    "Mr. Saw Kha Mu Htoo (Linn)",
-    "Ms. Paweena Pinnarong (New)",
-    "Ms. Patama Pumipuk (Pat)",
-  ];
-
-  function loadEmployees() {
-    const saved = localStorage.getItem('employees');
-    if (saved) {
-      try { return JSON.parse(saved); } catch(e) {}
-    }
-    return [...DEFAULT_EMPLOYEES];
-  }
-
-  function saveEmployees(list) {
-    localStorage.setItem('employees', JSON.stringify(list));
-  }
-
-  function renderDropdown() {
-    const sel = document.getElementById('name-input');
-    const current = sel.value;
-    const employees = loadEmployees();
-    sel.innerHTML = '<option value="">— กรุณาเลือกชื่อ —</option>';
-    employees.forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name;
-      if (name === current) opt.selected = true;
-      sel.appendChild(opt);
-    });
-  }
-
-  function renderEmpList() {
-    const list = document.getElementById('emp-list');
-    const employees = loadEmployees();
-    if (!employees.length) {
-      list.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:13px;padding:8px 0">ยังไม่มีรายชื่อ</div>';
-      return;
-    }
-    list.innerHTML = employees.map((name, i) => `
-      <div class="emp-item">
-        <span style="color:var(--text-dim);font-size:12px;font-family:Space Mono,monospace;min-width:20px">${i+1}.</span>
-        <span class="emp-item-name">${escapeHTML(name)}</span>
-        <button class="emp-delete-btn" onclick="deleteEmployee(${i})" title="ลบ">🗑</button>
-      </div>
-    `).join('');
-  }
-
-  function addEmployee() {
-    const input = document.getElementById('emp-add-input');
-    const name = input.value.trim();
-    if (!name) { showToast('⚠️ กรุณากรอกชื่อพนักงาน', 'error'); return; }
-    const employees = loadEmployees();
-    if (employees.includes(name)) {
-      showToast('⚠️ มีชื่อนี้อยู่แล้ว', 'error'); return;
-    }
-    employees.push(name);
-    saveEmployees(employees);
-    input.value = '';
-    renderDropdown();
-    renderEmpList();
-    showToast(`✓ เพิ่ม "${name}" แล้ว`, 'success');
-  }
-
-  function deleteEmployee(index) {
-    const employees = loadEmployees();
-    const name = employees[index];
-    if (!confirm(`ลบ "${name}" ออกจากรายชื่อ?`)) return;
-    employees.splice(index, 1);
-    saveEmployees(employees);
-    renderDropdown();
-    renderEmpList();
-    showToast(`ลบ "${name}" แล้ว`, 'info');
-  }
-
-  function toggleEmpPanel() {
-    const panel = document.getElementById('emp-panel');
-    const isOpen = panel.classList.contains('open');
-    if (isOpen) {
-      panel.classList.remove('open');
-    } else {
-      renderEmpList();
-      panel.classList.add('open');
-      document.getElementById('emp-add-input').focus();
-    }
-  }
-
   function onEmployeeChange() {
     todayStatus = { checkin: false, checkout: false };
     updateSubmitButton();
@@ -2029,14 +1814,12 @@
       }
     }
 
-
     // Prompt settings only if URL was manually cleared
     if (!GAS_URL) {
       setTimeout(openSettings, 800);
     }
 
     // Initial type setup
-    renderDropdown();
     setType('in');
     updateSubmitButton();
   });
