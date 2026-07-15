@@ -274,6 +274,13 @@
 
     .capture-btn:hover { transform: scale(1.05); }
     .capture-btn:active { transform: scale(0.95); }
+    .capture-btn:disabled,
+    .capture-btn[disabled] {
+      opacity: 0.35 !important;
+      cursor: not-allowed !important;
+      transform: none !important;
+      pointer-events: none !important;
+    }
 
     .capture-btn-inner {
       width: 44px; height: 44px;
@@ -482,6 +489,113 @@
 
     .history-status { font-size: 12px; color: var(--accent-in); flex-shrink: 0; }
     .history-status.err { color: var(--accent-out); }
+
+    /* ===== MANAGE EMPLOYEES ===== */
+    .manage-emp-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      max-width: 520px;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+      background: transparent;
+      color: var(--text-dim);
+      font-family: 'Sarabun', sans-serif;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 6px;
+      position: relative;
+      z-index: 1;
+    }
+    .manage-emp-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+    .emp-panel {
+      width: 100%;
+      max-width: 520px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      position: relative;
+      z-index: 1;
+      display: none;
+    }
+    .emp-panel.open { display: block; }
+
+    .emp-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .emp-panel-close {
+      background: none; border: none; color: var(--text-dim);
+      font-size: 20px; cursor: pointer; line-height: 1;
+      padding: 0 4px;
+      transition: color 0.2s;
+    }
+    .emp-panel-close:hover { color: var(--accent-out); }
+
+    .emp-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+
+    .emp-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      animation: slideIn 0.25s ease;
+    }
+    .emp-item-name { flex: 1; font-size: 14px; }
+    .emp-delete-btn {
+      background: none; border: none;
+      color: var(--text-dim); font-size: 16px; cursor: pointer;
+      padding: 2px 6px; border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .emp-delete-btn:hover { background: var(--glow-out); color: var(--accent-out); }
+
+    .emp-add-row {
+      display: flex; gap: 8px;
+      padding: 0 16px 16px;
+    }
+    .emp-add-input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-family: 'Sarabun', sans-serif;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .emp-add-input:focus { border-color: var(--accent-blue); }
+    .emp-add-input::placeholder { color: var(--text-dim); }
+    .emp-add-confirm {
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: none;
+      background: var(--accent-blue);
+      color: #fff;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: filter 0.2s;
+    }
+    .emp-add-confirm:hover { filter: brightness(1.1); }
 
     /* ===== STATUS BAR ===== */
     .status-bar {
@@ -874,6 +988,17 @@
         </div>
       </div>
       <canvas id="snapshot-canvas"></canvas>
+      <div id="face-hint" style="
+        font-size:12px;
+        color:var(--accent-blue);
+        font-weight:600;
+        letter-spacing:0.3px;
+        display:none;
+        align-items:center;
+        gap:5px;
+      ">
+        <span>🔍</span><span>หันหน้าเข้ากล้องเพื่อถ่ายรูป</span>
+      </div>
       <div id="photo-hint" style="
         font-size:12px;
         color:var(--accent-out);
@@ -907,11 +1032,6 @@
         <div class="select-wrap">
           <select class="employee-select" id="name-input" onchange="onEmployeeChange()">
             <option value="">— กรุณาเลือกชื่อ —</option>
-            <option value="Mr. Myo Thiha (Mo)">Mr. Myo Thiha (Mo)</option>
-            <option value="Ms. Aree Songchansitto (Ann)">Ms. Aree Songchansitto (Ann)</option>
-            <option value="Mr. Saw Kha Mu Htoo (Linn)">Mr. Saw Kha Mu Htoo (Linn)</option>
-            <option value="Ms. Paweena Pinnarong (New)">Ms. Paweena Pinnarong (New)</option>
-            <option value="Ms. Patama Pumipuk (Pat)">Ms. Patama Pumipuk (Pat)</option>
           </select>
           <span class="select-arrow">▼</span>
         </div>
@@ -921,6 +1041,25 @@
         <span id="btn-label">✓ บันทึกเข้างาน</span>
         <div class="spinner" id="spinner"></div>
       </button>
+    </div>
+  </div>
+
+  <!-- Manage Employees -->
+  <button class="manage-emp-btn" onclick="toggleEmpPanel()">
+    ➕ เพิ่ม / จัดการพนักงาน
+  </button>
+
+  <div class="emp-panel" id="emp-panel">
+    <div class="emp-panel-header">
+      <span>👥 รายชื่อพนักงาน</span>
+      <button class="emp-panel-close" onclick="toggleEmpPanel()">✕</button>
+    </div>
+    <div class="emp-list" id="emp-list"></div>
+    <div class="emp-add-row">
+      <input class="emp-add-input" id="emp-add-input"
+        placeholder="ชื่อพนักงานใหม่ เช่น Ms. Sara Lee (Sara)"
+        onkeydown="if(event.key==='Enter') addEmployee()" />
+      <button class="emp-add-confirm" onclick="addEmployee()">เพิ่ม</button>
     </div>
   </div>
 
@@ -972,7 +1111,7 @@
   let stream = null;
   let capturedImageBase64 = null;
   let selectedDeviceId = localStorage.getItem('camera_device_id') || '';
-  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbw-eFZJl7Yzuuoc6KVsGErW4TlOdq53FXicHTD8kYYxH5fgwRm6SyGy-0tc-1eHDAMk/exec';
+  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbweYNwAxVWBVT6EMKcgJZ74Jq5yCoj8VO1WhzszTdykVmwTP80kqFJFEMG7iwbolgFf/exec';
   let history = JSON.parse(localStorage.getItem('checkin_history') || '[]');
 
   // ============================================================
@@ -1006,6 +1145,7 @@
       dot.className = 'face-dot';
       statusText.textContent = 'ไม่พบใบหน้า';
       console.log('BlazeFace model loaded ✅');
+      updateCaptureButton();
 
       const video = document.getElementById('video-feed');
       if (stream && video.readyState >= 2) {
@@ -1062,7 +1202,26 @@
         lastDetectTime = now;
         try {
           const preds = await faceModel.estimateFaces(video, false);
-          lastDetections = preds || [];
+          const vw = video.videoWidth  || 640;
+          const vh = video.videoHeight || 480;
+          // เงื่อนไขใบหน้าที่ถ่ายได้:
+          // 1. score >= 0.88
+          // 2. กรอบสูง/กว้าง >= 20% ของภาพ (ไม่ใช่แค่หน้าผาก)
+          // 3. center Y อยู่ในช่วง 20-80% (ไม่ใช่ขอบบน/ล่าง)
+          // 4. center X อยู่ในช่วง 15-85% (ไม่ใช่ขอบซ้าย/ขวา)
+          const minSize = vh * 0.20;
+          lastDetections = (preds || []).filter(p => {
+            const score = p.probability?.[0] || 0;
+            const x1 = p.topLeft[0],     y1 = p.topLeft[1];
+            const x2 = p.bottomRight[0], y2 = p.bottomRight[1];
+            const faceW  = x2 - x1;
+            const faceH  = y2 - y1;
+            const centerX = (x1 + x2) / 2 / vw;
+            const centerY = (y1 + y2) / 2 / vh;
+            const inCenterX = centerX >= 0.15 && centerX <= 0.85;
+            const inCenterY = centerY >= 0.20 && centerY <= 0.80;
+            return score >= 0.88 && faceH >= minSize && faceW >= minSize && inCenterX && inCenterY;
+          });
         } catch(e) { lastDetections = []; }
       }
 
@@ -1077,7 +1236,8 @@
         faceDetected = true;
         dot.className = 'face-dot detected';
         statusText.textContent = lastDetections.length > 1
-          ? `พบ ${lastDetections.length} ใบหน้า` : 'พบใบหน้า ✓';
+          ? `พบ ${lastDetections.length} ใบหน้า ✓` : 'พบใบหน้า ✓ พร้อมถ่าย';
+        updateCaptureButton();
 
         lastDetections.forEach(pred => {
           // BlazeFace: topLeft=[x,y], bottomRight=[x,y]
@@ -1107,7 +1267,12 @@
       } else {
         faceDetected = false;
         dot.className = 'face-dot';
-        statusText.textContent = 'ไม่พบใบหน้า';
+        // บอกสาเหตุให้ชัด ถ้ามี detection แต่ไม่ผ่าน filter
+        const rawCount = (await faceModel.estimateFaces(video, false).catch(()=>[])).length;
+        statusText.textContent = rawCount > 0
+          ? 'ขยับหน้าเข้ากล้อง / ให้อยู่กลางภาพ'
+          : 'ไม่พบใบหน้า';
+        updateCaptureButton();
         drawScanOverlay(ctx, cw, ch, now);
       }
 
@@ -1117,6 +1282,51 @@
     }
 
     faceDetectionLoop = requestAnimationFrame(detectFaceLoop);
+  }
+
+  // วาด guide frame แนะนำตำแหน่งใบหน้า
+  function drawFaceGuide(ctx, cw, ch, now) {
+    const color = currentType === 'in' ? '#00e5a0' : '#ff4d6d';
+    const pulse = 0.55 + Math.sin(now / 600) * 0.25;
+
+    // วงรีกรอบใบหน้า (ครอบ 50% กว้าง, 60% สูง ตรงกลาง)
+    const ew = cw * 0.50, eh = ch * 0.60;
+    const ex = cw / 2, ey = ch / 2;
+
+    // เงาด้านนอกวงรี (ทำให้ชัด)
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.12 * pulse;
+    ctx.lineWidth = 20;
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, ew/2 + 10, eh/2 + 10, 0, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // วงรีหลัก
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.6 * pulse;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 5]);
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, ew/2, eh/2, 0, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // จุดบน-ล่าง-ซ้าย-ขวา
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.7 * pulse;
+    [[ex, ey-eh/2],[ex, ey+eh/2],[ex-ew/2, ey],[ex+ew/2, ey]].forEach(([px,py]) => {
+      ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI*2); ctx.fill();
+    });
+
+    // ข้อความแนะนำ
+    ctx.globalAlpha = 0.8 * pulse;
+    ctx.font = 'bold 12px Sarabun, sans-serif';
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.fillText('วางใบหน้าให้อยู่ในกรอบ', ex, ey - eh/2 - 12);
+    ctx.restore();
   }
 
   function drawScanOverlay(ctx, cw, ch, now) {
@@ -1141,22 +1351,8 @@
       ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(cw,gy); ctx.stroke();
     }
 
-    // center reticle
-    const cx2 = cw/2, cy2 = ch/2;
-    const pulse = 0.65 + Math.sin(now/500)*0.35;
-    const rSize = Math.min(cw, ch) * 0.26;
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.globalAlpha = 0.45 * pulse;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(cx2, cy2, rSize, 0, Math.PI*2); ctx.stroke();
-    const cLen = rSize * 0.25;
-    ctx.globalAlpha = 0.3 * pulse;
-    ctx.beginPath();
-    ctx.moveTo(cx2-cLen,cy2); ctx.lineTo(cx2+cLen,cy2);
-    ctx.moveTo(cx2,cy2-cLen); ctx.lineTo(cx2,cy2+cLen);
-    ctx.stroke();
-    ctx.restore();
+    // วาด face guide แทน reticle
+    drawFaceGuide(ctx, cw, ch, now);
   }
 
   function drawFaceBox(ctx, x, y, w, h, now, score) {
@@ -1349,9 +1545,21 @@
     const img = document.getElementById('captured-img');
 
     if (!stream || !video.srcObject) {
-      // Try to start camera if not available
       startCamera();
       return;
+    }
+
+    // ล็อค: ต้องตรวจเจอใบหน้าชัดเจนก่อนจึงถ่ายได้
+    if (faceApiReady && faceModel) {
+      if (!faceDetected) {
+        showToast('🔍 ไม่พบใบหน้า กรุณาหันหน้าเข้ากล้อง', 'error');
+        return;
+      }
+      // ตรวจ real-time อีกครั้งก่อนถ่าย (ป้องกันกรณีเจอแค่ครึ่งหน้า)
+      if (lastDetections.length === 0) {
+        showToast('🔍 กรุณาให้ใบหน้าอยู่ตรงกลางกล้อง', 'error');
+        return;
+      }
     }
 
     canvas.width = video.videoWidth || 640;
@@ -1377,6 +1585,7 @@
 
   function retakePhoto() {
     capturedImageBase64 = null;
+    faceDetected = false;  // reset ให้ต้องตรวจจับใหม่
     const video = document.getElementById('video-feed');
     const img = document.getElementById('captured-img');
     video.style.display = 'block';
@@ -1489,6 +1698,20 @@
     updateSubmitButton();
   }
 
+  function updateCaptureButton() {
+    const btn = document.getElementById('capture-btn');
+    const hint = document.getElementById('face-hint');
+    if (!btn) return;
+    // ล็อคปุ่มถ่ายรูปถ้า model โหลดแล้วแต่ยังไม่เจอหน้า
+    if (faceApiReady && faceModel && !faceDetected) {
+      btn.disabled = true;
+      if (hint) hint.style.display = 'flex';
+    } else {
+      btn.disabled = false;
+      if (hint) hint.style.display = 'none';
+    }
+  }
+
   function updateSubmitButton() {
     const submitBtn = document.getElementById('submit-btn');
     const btnLabel  = document.getElementById('btn-label');
@@ -1532,20 +1755,27 @@
       return;
     }
     if (!GAS_URL) {
-      showToast('⚙️ กรุณาตั้งค่า URL ก่อน', 'error');
-      openSettings();
+      showToast('⚙️ ไม่พบ URL ของ Apps Script', 'error');
+      return;
+    }
+
+    // ตรวจรูปก่อน (ก่อน disable ปุ่ม)
+    if (!capturedImageBase64) {
+      showToast('📷 กรุณาถ่ายรูปก่อนบันทึก', 'error');
       return;
     }
 
     const typeLabel = currentType === 'in' ? 'เข้างาน' : 'ออกงาน';
 
-    // ── ตรวจสอบฝั่ง client ก่อน ──────────────────────────────────
+    // ตรวจสอบสถานะฝั่ง client
     if (typeLabel === 'เข้างาน' && todayStatus.checkin) {
-      showToast('⚠️ ' + name.split('(')[1]?.replace(')','') + ' Check-in วันนี้แล้ว', 'error');
+      const nick = name.match(/\(([^)]+)\)/)?.[1] || name;
+      showToast('⚠️ ' + nick + ' Check-in วันนี้แล้ว', 'error');
       return;
     }
     if (typeLabel === 'ออกงาน' && todayStatus.checkout) {
-      showToast('⚠️ ' + name.split('(')[1]?.replace(')','') + ' Check-out วันนี้แล้ว', 'error');
+      const nick = name.match(/\(([^)]+)\)/)?.[1] || name;
+      showToast('⚠️ ' + nick + ' Check-out วันนี้แล้ว', 'error');
       return;
     }
     if (typeLabel === 'ออกงาน' && !todayStatus.checkin) {
@@ -1553,7 +1783,7 @@
       return;
     }
 
-    // UI loading
+    // UI loading state
     const submitBtn = document.getElementById('submit-btn');
     const btnLabel  = document.getElementById('btn-label');
     const spinner   = document.getElementById('spinner');
@@ -1561,11 +1791,6 @@
     btnLabel.style.display = 'none';
     spinner.style.display = 'block';
 
-    // ตรวจ double-check ไม่ให้ผ่านหากยังไม่ถ่ายรูป
-    if (!capturedImageBase64) {
-      showToast('📷 กรุณาถ่ายรูปก่อนบันทึก', 'error');
-      return;
-    }
     const imageData = capturedImageBase64;
 
     try {
@@ -1601,11 +1826,10 @@
           document.getElementById('chip-out-text').textContent = '✓ Check-out แล้ว';
         }
 
-        // แสดง success popup
         showSuccessPopup(nickname, typeLabel, capturedImageBase64);
 
       } else if (text.startsWith('Duplicate')) {
-        showToast('⚠️ ' + text.replace('Duplicate: ',''), 'error');
+        showToast('⚠️ ' + text.replace('Duplicate: ', ''), 'error');
       } else if (text.startsWith('NoCheckin')) {
         showToast('⚠️ ยังไม่ได้ Check-in วันนี้', 'error');
       } else {
@@ -1720,6 +1944,99 @@
     }
   }
 
+  // ============================================================
+  // MANAGE EMPLOYEES
+  // ============================================================
+  // รายชื่อเริ่มต้น (ฝังในโค้ด)
+  const DEFAULT_EMPLOYEES = [
+    "Mr. Myo Thiha (Mo)",
+    "Ms. Aree Songchansitto (Ann)",
+    "Mr. Saw Kha Mu Htoo (Linn)",
+    "Ms. Paweena Pinnarong (New)",
+    "Ms. Patama Pumipuk (Pat)",
+  ];
+
+  function loadEmployees() {
+    const saved = localStorage.getItem('employees');
+    if (saved) {
+      try { return JSON.parse(saved); } catch(e) {}
+    }
+    return [...DEFAULT_EMPLOYEES];
+  }
+
+  function saveEmployees(list) {
+    localStorage.setItem('employees', JSON.stringify(list));
+  }
+
+  function renderDropdown() {
+    const sel = document.getElementById('name-input');
+    const current = sel.value;
+    const employees = loadEmployees();
+    sel.innerHTML = '<option value="">— กรุณาเลือกชื่อ —</option>';
+    employees.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      if (name === current) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  function renderEmpList() {
+    const list = document.getElementById('emp-list');
+    const employees = loadEmployees();
+    if (!employees.length) {
+      list.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:13px;padding:8px 0">ยังไม่มีรายชื่อ</div>';
+      return;
+    }
+    list.innerHTML = employees.map((name, i) => `
+      <div class="emp-item">
+        <span style="color:var(--text-dim);font-size:12px;font-family:Space Mono,monospace;min-width:20px">${i+1}.</span>
+        <span class="emp-item-name">${escapeHTML(name)}</span>
+        <button class="emp-delete-btn" onclick="deleteEmployee(${i})" title="ลบ">🗑</button>
+      </div>
+    `).join('');
+  }
+
+  function addEmployee() {
+    const input = document.getElementById('emp-add-input');
+    const name = input.value.trim();
+    if (!name) { showToast('⚠️ กรุณากรอกชื่อพนักงาน', 'error'); return; }
+    const employees = loadEmployees();
+    if (employees.includes(name)) {
+      showToast('⚠️ มีชื่อนี้อยู่แล้ว', 'error'); return;
+    }
+    employees.push(name);
+    saveEmployees(employees);
+    input.value = '';
+    renderDropdown();
+    renderEmpList();
+    showToast(`✓ เพิ่ม "${name}" แล้ว`, 'success');
+  }
+
+  function deleteEmployee(index) {
+    const employees = loadEmployees();
+    const name = employees[index];
+    if (!confirm(`ลบ "${name}" ออกจากรายชื่อ?`)) return;
+    employees.splice(index, 1);
+    saveEmployees(employees);
+    renderDropdown();
+    renderEmpList();
+    showToast(`ลบ "${name}" แล้ว`, 'info');
+  }
+
+  function toggleEmpPanel() {
+    const panel = document.getElementById('emp-panel');
+    const isOpen = panel.classList.contains('open');
+    if (isOpen) {
+      panel.classList.remove('open');
+    } else {
+      renderEmpList();
+      panel.classList.add('open');
+      document.getElementById('emp-add-input').focus();
+    }
+  }
+
   function onEmployeeChange() {
     todayStatus = { checkin: false, checkout: false };
     updateSubmitButton();
@@ -1814,12 +2131,14 @@
       }
     }
 
+
     // Prompt settings only if URL was manually cleared
     if (!GAS_URL) {
       setTimeout(openSettings, 800);
     }
 
     // Initial type setup
+    renderDropdown();
     setType('in');
     updateSubmitButton();
   });
