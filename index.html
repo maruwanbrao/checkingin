@@ -1191,6 +1191,41 @@
     lastDetections = [];
   }
 
+  // ── ตรวจสอบว่าเป็น "ใบหน้าจริง" ไม่ใช่แค่หน้าผาก/ผมบางส่วน ──
+  // เช็คว่ามี landmark ตา-จมูก-ปาก ครบ และตำแหน่งสัมพันธ์กันสมเหตุสมผล
+  function isValidFacePrediction(p) {
+    const lm = p.landmarks;
+    if (!lm || lm.length < 6) return false; // BlazeFace ต้องให้ 6 จุด: ตาขวา,ตาซ้าย,จมูก,ปาก,หูขวา,หูซ้าย
+
+    const [rEye, lEye, nose, mouth] = lm;
+    const x1 = p.topLeft[0], y1 = p.topLeft[1], x2 = p.bottomRight[0], y2 = p.bottomRight[1];
+    const w = x2 - x1, h = y2 - y1;
+    if (w <= 0 || h <= 0) return false;
+
+    // จุด landmark หลัก (ตา/จมูก/ปาก) ต้องอยู่ในกรอบใบหน้า (มี margin เล็กน้อย)
+    const margin = 0.15;
+    const inBox = ([lx, ly]) =>
+      lx >= x1 - w * margin && lx <= x2 + w * margin &&
+      ly >= y1 - h * margin && ly <= y2 + h * margin;
+    if (![rEye, lEye, nose, mouth].every(inBox)) return false;
+
+    // ระยะห่างตาต้องสมเหตุสมผลเทียบกับความกว้างกรอบใบหน้า (ไม่ใช่จุดมั่วบนหน้าผาก)
+    const eyeDist = Math.hypot(rEye[0] - lEye[0], rEye[1] - lEye[1]);
+    if (eyeDist < w * 0.18 || eyeDist > w * 0.75) return false;
+
+    // ตำแหน่งแนวตั้งสัมพัทธ์ในกรอบ: ตาอยู่ครึ่งบน, จมูกอยู่ใต้ตา, ปากอยู่ใต้จมูกและอยู่ครึ่งล่าง
+    const eyeY     = (rEye[1] + lEye[1]) / 2;
+    const relEyeY  = (eyeY    - y1) / h;
+    const relNoseY = (nose[1] - y1) / h;
+    const relMouthY= (mouth[1]- y1) / h;
+
+    if (relEyeY > 0.55) return false;                    // ตาต้องอยู่ครึ่งบนของกรอบ (ถ้าเจอแค่หน้าผาก ตาจะเลื่อนลงมาผิดที่ หรือไม่ครบ)
+    if (relNoseY <= relEyeY || relNoseY > 0.85) return false;
+    if (relMouthY <= relNoseY || relMouthY < 0.45) return false;
+
+    return true;
+  }
+
   async function detectFaceLoop() {
     const video  = document.getElementById('video-feed');
     const canvas = document.getElementById('face-canvas');
@@ -1225,9 +1260,10 @@
           const preds = await faceModel.estimateFaces(video, false);
           const valid = (preds||[]).filter(p => {
             const s=p.probability?.[0]||0, x1=p.topLeft[0], y1=p.topLeft[1], x2=p.bottomRight[0], y2=p.bottomRight[1];
-            return s>=0.88 && (x2-x1)>=minSize && (y2-y1)>=minSize &&
+            const basicOk = s>=0.88 && (x2-x1)>=minSize && (y2-y1)>=minSize &&
                    (x1+x2)/2/vw>=0.15 && (x1+x2)/2/vw<=0.85 &&
                    (y1+y2)/2/vh>=0.20 && (y1+y2)/2/vh<=0.80;
+            return basicOk && isValidFacePrediction(p);
           });
           if (valid.length === 0) {
             // หน้าหายไป → reset scan
@@ -1269,9 +1305,10 @@
         const preds = await faceModel.estimateFaces(video, false);
         const valid = (preds||[]).filter(p => {
           const s=p.probability?.[0]||0, x1=p.topLeft[0], y1=p.topLeft[1], x2=p.bottomRight[0], y2=p.bottomRight[1];
-          return s>=0.88 && (x2-x1)>=minSize && (y2-y1)>=minSize &&
+          const basicOk = s>=0.88 && (x2-x1)>=minSize && (y2-y1)>=minSize &&
                  (x1+x2)/2/vw>=0.15 && (x1+x2)/2/vw<=0.85 &&
                  (y1+y2)/2/vh>=0.20 && (y1+y2)/2/vh<=0.80;
+          return basicOk && isValidFacePrediction(p);
         });
         lastDetections = valid;
 
@@ -1570,7 +1607,7 @@
     await startCamera(selectedDeviceId);
   }
 
-  function capturePhoto() {
+  async function capturePhoto() {
     const video = document.getElementById('video-feed');
     const canvas = document.getElementById('snapshot-canvas');
     const img = document.getElementById('captured-img');
@@ -1580,15 +1617,32 @@
       return;
     }
 
-    // ล็อค: ต้องตรวจเจอใบหน้าชัดเจนก่อนจึงถ่ายได้
+    // ล็อค: ต้องตรวจเจอใบหน้าครบ (ตา-จมูก-ปาก) ก่อนจึงถ่ายได้
     if (faceApiReady && faceModel) {
       if (!faceDetected) {
         showToast('🔍 ไม่พบใบหน้า กรุณาหันหน้าเข้ากล้อง', 'error');
         return;
       }
-      // ตรวจ real-time อีกครั้งก่อนถ่าย (ป้องกันกรณีเจอแค่ครึ่งหน้า)
-      if (lastDetections.length === 0) {
-        showToast('🔍 กรุณาให้ใบหน้าอยู่ตรงกลางกล้อง', 'error');
+      // ตรวจซ้ำแบบ real-time ทันทีก่อนถ่าย (กันกรณีเห็นแค่หน้าผาก/บางส่วนแล้วขยับหนี)
+      try {
+        const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+        const minSize = vh * 0.20;
+        const preds = await faceModel.estimateFaces(video, false);
+        const okFace = (preds || []).find(p => {
+          const s = p.probability?.[0] || 0, x1 = p.topLeft[0], y1 = p.topLeft[1], x2 = p.bottomRight[0], y2 = p.bottomRight[1];
+          const basicOk = s >= 0.88 && (x2 - x1) >= minSize && (y2 - y1) >= minSize &&
+                 (x1 + x2) / 2 / vw >= 0.15 && (x1 + x2) / 2 / vw <= 0.85 &&
+                 (y1 + y2) / 2 / vh >= 0.20 && (y1 + y2) / 2 / vh <= 0.80;
+          return basicOk && isValidFacePrediction(p);
+        });
+        if (!okFace) {
+          faceDetected = false;
+          updateCaptureButton();
+          showToast('🔍 มองเห็นใบหน้าไม่ชัดเจน กรุณาหันหน้าให้เห็นตา-จมูก-ปากชัดๆ', 'error');
+          return;
+        }
+      } catch (e) {
+        showToast('🔍 ตรวจสอบใบหน้าไม่สำเร็จ กรุณาลองใหม่', 'error');
         return;
       }
     }
