@@ -1217,7 +1217,7 @@
       // canvas ว่าง — ไม่วาดอะไร กรอบมุมกล้อง CSS ยังแสดงอยู่
 
       // ตรวจซ้ำทุก 800ms ว่าหน้ายังอยู่ไหม
-      if (now - lastDetectTime > 400) {
+      if (now - lastDetectTime > 800) {
         lastDetectTime = now;
         try {
           const vw = video.videoWidth||640, vh = video.videoHeight||480;
@@ -1580,33 +1580,16 @@
       return;
     }
 
-    // ล็อค: ตรวจจับใบหน้า real-time ทุกครั้งก่อนถ่าย
+    // ล็อค: ต้องตรวจเจอใบหน้าชัดเจนก่อนจึงถ่ายได้
     if (faceApiReady && faceModel) {
-      try {
-        const video2 = document.getElementById('video-feed');
-        const vw2 = video2.videoWidth||640, vh2 = video2.videoHeight||480;
-        const minSize2 = vh2 * 0.20;
-        const nowPreds = await faceModel.estimateFaces(video2, false);
-        const validNow = (nowPreds||[]).filter(p => {
-          const s=p.probability?.[0]||0, x1=p.topLeft[0], y1=p.topLeft[1], x2=p.bottomRight[0], y2=p.bottomRight[1];
-          return s>=0.88 && (x2-x1)>=minSize2 && (y2-y1)>=minSize2 &&
-                 (x1+x2)/2/vw2>=0.15 && (x1+x2)/2/vw2<=0.85 &&
-                 (y1+y2)/2/vh2>=0.20 && (y1+y2)/2/vh2<=0.80;
-        });
-        if (validNow.length === 0) {
-          // หน้าหายไปแล้ว — reset กลับไป scan ใหม่
-          faceDetected = false;
-          scanPhase = 'scanning'; scanLineY = 0; scanComplete = false; lockedBox = null;
-          const dot2 = document.getElementById('face-dot');
-          const st2  = document.getElementById('face-status-text');
-          if (dot2) dot2.className = 'face-dot';
-          if (st2)  st2.textContent = 'ไม่พบใบหน้า';
-          updateCaptureButton();
-          showToast('🔍 ไม่พบใบหน้า กรุณาหันหน้าเข้ากล้อง', 'error');
-          return;
-        }
-      } catch(e) {
-        // ถ้าตรวจไม่ได้ให้ผ่าน (กันกรณี model ยังไม่พร้อม)
+      if (!faceDetected) {
+        showToast('🔍 ไม่พบใบหน้า กรุณาหันหน้าเข้ากล้อง', 'error');
+        return;
+      }
+      // ตรวจ real-time อีกครั้งก่อนถ่าย (ป้องกันกรณีเจอแค่ครึ่งหน้า)
+      if (lastDetections.length === 0) {
+        showToast('🔍 กรุณาให้ใบหน้าอยู่ตรงกลางกล้อง', 'error');
+        return;
       }
     }
 
