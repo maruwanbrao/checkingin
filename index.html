@@ -772,82 +772,6 @@
       backdrop-filter: blur(12px);
     }
 
-    /* ===== SETTINGS MODAL ===== */
-    .settings-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 300;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-      background: rgba(0,0,0,0.72);
-      backdrop-filter: blur(12px);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.25s ease;
-    }
-    .settings-overlay.open {
-      opacity: 1;
-      pointer-events: all;
-    }
-    .settings-modal {
-      width: 100%;
-      max-width: 380px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 24px;
-      box-shadow: 0 32px 80px rgba(0,0,0,0.6);
-    }
-    .settings-title {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-    .settings-desc {
-      font-size: 13px;
-      color: var(--text-dim);
-      margin-bottom: 16px;
-      line-height: 1.5;
-    }
-    .settings-input {
-      width: 100%;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px 14px;
-      color: var(--text);
-      font-family: 'Space Mono', monospace;
-      font-size: 12px;
-      outline: none;
-    }
-    .settings-input:focus { border-color: var(--accent-blue); }
-    .modal-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 18px;
-    }
-    .btn-secondary, .btn-primary {
-      flex: 1;
-      padding: 12px;
-      border: none;
-      border-radius: 10px;
-      font-family: 'Sarabun', sans-serif;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn-secondary {
-      background: var(--surface);
-      color: var(--text-dim);
-      border: 1px solid var(--border);
-    }
-    .btn-primary {
-      background: var(--accent-blue);
-      color: #0a0a0f;
-    }
-
     .popup-card {
       position: relative;
       width: 100%;
@@ -1016,7 +940,8 @@
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="clock-badge"><span id="live-clock">--:--:--</span></div>
-          </div>
+
+    </div>
   </header>
 
   <div class="main-card">
@@ -1048,32 +973,6 @@
         <video id="video-feed" autoplay playsinline muted></video>
         <img id="captured-img" alt="ภาพถ่าย" />
         <canvas id="face-canvas"></canvas>
-
-        <!-- Silhouette guide -->
-        <svg id="face-silhouette" xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 200 300"
-          style="position:absolute;top:50%;left:50%;transform:translate(-50%,-48%);
-                 width:58%;height:auto;pointer-events:none;z-index:2;opacity:0.18;
-                 transition:opacity 0.6s ease;">
-          <path d="
-            M100,18
-            C76,18 58,38 56,62
-            C54,78 55,92 57,103
-            C52,106 49,111 49,118
-            C49,126 52,132 58,134
-            C61,148 68,160 78,168
-            C76,178 72,186 65,191
-            C48,199 28,212 22,240
-            L22,300 L178,300 L178,240
-            C172,212 152,199 135,191
-            C128,186 124,178 122,168
-            C132,160 139,148 142,134
-            C148,132 151,126 151,118
-            C151,111 148,106 143,103
-            C145,92 146,78 144,62
-            C142,38 124,18 100,18 Z
-          " fill="none" stroke="white" stroke-width="2" stroke-linejoin="round"/>
-        </svg>
 
         <div class="camera-overlay">
           <div class="corner corner-tl corner-in" id="corner-tl"></div>
@@ -1198,16 +1097,6 @@
   <div id="toast"><span class="toast-icon" id="toast-icon">✓</span><span id="toast-msg">บันทึกสำเร็จ</span></div>
 
 
-  <!-- Settings Modal -->
-  <div class="settings-overlay" id="settings-overlay">
-    <div class="settings-modal">
-      <div class="settings-title">⚙️ ตั้งค่า Apps Script URL</div>
-      <div class="settings-desc">
-        วาง Web App URL ที่ได้จากการ Deploy Google Apps Script (ลงท้ายด้วย /exec)
-        ถ้าเพิ่ง redeploy เวอร์ชันใหม่ ให้แปะ URL ล่าสุดตรงนี้
-      </div>
-      <input type="text" class="settings-input" id="gas-url-input"
-        placeholder="https://script.google.com/macros/s/XXXX/exec" />
       <div class="modal-actions">
         <button class="btn-secondary" onclick="closeSettings()">ยกเลิก</button>
         <button class="btn-primary" onclick="saveSettings()">บันทึก</button>
@@ -1225,43 +1114,6 @@
   let selectedDeviceId = localStorage.getItem('camera_device_id') || '';
   let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbw-eFZJl7Yzuuoc6KVsGErW4TlOdq53FXicHTD8kYYxH5fgwRm6SyGy-0tc-1eHDAMk/exec';
   let history = JSON.parse(localStorage.getItem('checkin_history') || '[]');
-
-  // ============================================================
-  // SETTINGS MODAL (Apps Script URL)
-  // ============================================================
-  function openSettings() {
-    const input = document.getElementById('gas-url-input');
-    input.value = GAS_URL || '';
-    document.getElementById('settings-overlay').classList.add('open');
-    input.focus();
-  }
-
-  function closeSettings() {
-    document.getElementById('settings-overlay').classList.remove('open');
-  }
-
-  function saveSettings() {
-    const input = document.getElementById('gas-url-input');
-    const url = input.value.trim();
-
-    if (!url) {
-      showToast('⚠️ กรุณากรอก URL ของ Apps Script', 'error');
-      return;
-    }
-    if (!/^https:\/\/script\.google(usercontent)?\.com\/macros\/s\/.+\/exec$/.test(url)) {
-      showToast('⚠️ URL ไม่ถูกต้อง ต้องลงท้ายด้วย /exec', 'error');
-      return;
-    }
-
-    GAS_URL = url;
-    localStorage.setItem('gas_url', url);
-    closeSettings();
-    showToast('✓ บันทึก URL แล้ว', 'success');
-
-    // เช็คสถานะพนักงานที่เลือกอยู่ใหม่ด้วย URL ล่าสุด
-    const name = document.getElementById('name-input')?.value?.trim();
-    if (name) checkEmployeeStatus(name);
-  }
 
   // ============================================================
   // FACE DETECTION — TensorFlow.js BlazeFace (ทุก browser)
@@ -1384,8 +1236,6 @@
             dot.className = 'face-dot';
             statusText.textContent = 'ไม่พบใบหน้า';
             updateCaptureButton();
-            const silR = document.getElementById('face-silhouette');
-            if (silR) silR.style.opacity = '0.18';
           }
         } catch(e) {}
       }
@@ -1450,8 +1300,6 @@
         dot.className = 'face-dot detected';
         statusText.textContent = 'พบใบหน้า ✓ พร้อมถ่าย';
         updateCaptureButton();
-        // ซ่อน silhouette เมื่อเจอหน้าแล้ว
-        const sil = document.getElementById('face-silhouette');
         if (sil) sil.style.opacity = '0';
       } else {
         // ❌ ไม่พบ → รอ 800ms แล้ว scan ใหม่
@@ -1770,8 +1618,6 @@
     capturedImageBase64 = null;
     faceDetected = false;
     scanPhase = 'scanning'; scanLineY = 0; scanComplete = false; lockedBox = null;
-    const silRet = document.getElementById('face-silhouette');
-    if (silRet) silRet.style.opacity = '0.18';
     const video = document.getElementById('video-feed');
     const img = document.getElementById('captured-img');
     video.style.display = 'block';
@@ -1802,8 +1648,6 @@
 
     if (faceApiReady && stream) {
       scanPhase = 'scanning'; scanLineY = 0; scanComplete = false; lockedBox = null; faceDetected = false;
-      const silSt = document.getElementById('face-silhouette');
-      if (silSt) silSt.style.opacity = '0.18';
       startFaceDetection();
     }
     const btnIn = document.getElementById('btn-checkin');
