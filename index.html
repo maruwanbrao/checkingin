@@ -380,6 +380,32 @@
     .submit-btn:active { transform: translateY(0); }
     .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
+    /* Saving... gradient blinking text */
+    .btn-label-saving {
+      background: linear-gradient(90deg, #ffffff, #b3ffe4, #ffffff, #b3ffe4);
+      background-size: 300% auto;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      animation: gradientMove 1.4s linear infinite, textBlink 1s ease-in-out infinite;
+    }
+    .submit-btn.btn-out .btn-label-saving {
+      background: linear-gradient(90deg, #ffffff, #ffd6de, #ffffff, #ffd6de);
+      background-size: 300% auto;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    @keyframes gradientMove {
+      0% { background-position: 0% center; }
+      100% { background-position: 300% center; }
+    }
+    @keyframes textBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.45; }
+    }
+
     /* Loading spinner */
     .spinner {
       width: 18px; height: 18px;
@@ -1979,7 +2005,10 @@
     const btnLabel  = document.getElementById('btn-label');
     const spinner   = document.getElementById('spinner');
     submitBtn.disabled = true;
-    btnLabel.style.display = 'none';
+    const prevLabelText = btnLabel.textContent;
+    btnLabel.textContent = 'กำลังบันทึกข้อมูล';
+    btnLabel.classList.add('btn-label-saving');
+    btnLabel.style.display = 'inline';
     spinner.style.display = 'block';
 
     const imageData = capturedImageBase64;
@@ -2032,6 +2061,7 @@
       addHistory(name, typeLabel, 'error', '');
     } finally {
       submitBtn.disabled = false;
+      btnLabel.classList.remove('btn-label-saving');
       btnLabel.style.display = 'inline';
       spinner.style.display = 'none';
       updateSubmitButton();
