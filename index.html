@@ -1253,7 +1253,7 @@
   let stream = null;
   let capturedImageBase64 = null;
   let selectedDeviceId = localStorage.getItem('camera_device_id') || '';
-  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbzzQ6FuraEBluSrbO_iB5yyYGRCjiC7nUXMiOrj3z935y-pbjT30GD9jx4Zn2MWXCeu/exec';
+  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbwDLLoBMYL_A_tyxMdNjsYG-V6dmqXzdlbRIEiIna6etaoKhjMqr41JWh84ZpFE_AWZ/exec';
   let history = JSON.parse(localStorage.getItem('checkin_history') || '[]');
 
   // ============================================================
@@ -1775,13 +1775,19 @@
       }
     }
 
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    // ลดขนาดรูปก่อนส่ง เพื่อให้อัปโหลดเร็วขึ้น (รูปสำหรับบันทึกยืนยันตัวตน
+    // ไม่จำเป็นต้องละเอียดเต็มความละเอียดกล้อง — กว้างไม่เกิน 480px ก็ชัดพอ)
+    const MAX_UPLOAD_WIDTH = 480;
+    const vw = video.videoWidth || 640;
+    const vh = video.videoHeight || 480;
+    const scale = Math.min(1, MAX_UPLOAD_WIDTH / vw);
+    canvas.width = Math.round(vw * scale);
+    canvas.height = Math.round(vh * scale);
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     // Compress to reasonable size for sending to Apps Script
-    capturedImageBase64 = canvas.toDataURL('image/jpeg', 0.55);
+    capturedImageBase64 = canvas.toDataURL('image/jpeg', 0.5);
 
     img.src = capturedImageBase64;
     img.style.display = 'block';
