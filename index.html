@@ -1042,7 +1042,11 @@
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="clock-badge"><span id="live-clock">--:--:--</span></div>
-          </div>
+      <button onclick="openSettings()" title="ตั้งค่า Apps Script URL" style="
+        width:34px;height:34px;border-radius:10px;border:1px solid var(--border);
+        background:var(--card);color:var(--text-dim);cursor:pointer;
+        display:flex;align-items:center;justify-content:center;font-size:15px;">⚙️</button>
+    </div>
   </header>
 
   <div class="main-card">
@@ -1805,6 +1809,16 @@
     document.getElementById('cam-status').style.display = 'flex';
     document.getElementById('retake-btn').classList.remove('visible');
     document.getElementById('capture-btn').style.display = 'flex';
+    document.getElementById('photo-hint').style.display = 'flex';
+    updateCaptureButton();
+    updateSubmitButton();
+    // บั๊ค (แก้แล้ว): เดิม loop ตรวจจับใบหน้า (detectFaceLoop) ถูก stop ไว้ตอนถ่ายรูป
+    // แล้วไม่มีการ start ใหม่ตรงนี้ ทำให้ faceDetected ค้างเป็น false ตลอดไป
+    // กดปุ่มถ่ายรูปใหม่ไม่ได้อีกเลยหลังจากกด "ถ่ายใหม่" ครั้งแรก
+    if (faceApiReady && stream) {
+      resizeFaceCanvas();
+      startFaceDetection();
+    }
   }
 
   // ============================================================
@@ -2047,6 +2061,12 @@
         }
 
         showSuccessPopup(nickname, typeLabel, capturedImageBase64);
+
+        // บั๊ค (แก้แล้ว): เดิมรูปที่ถ่ายไว้จะค้างอยู่ในตัวแปรหลังบันทึกสำเร็จ
+        // ถ้าพนักงานคนถัดไปมาสแกนต่อโดยไม่ได้สลับปุ่ม เข้างาน/ออกงาน ระบบจะยอมให้
+        // กดบันทึกได้ทันทีโดยใช้ "รูปของคนก่อนหน้า" ซ้ำ (เพราะ hasPhoto ยัง true อยู่)
+        // จึงต้องรีเซ็ตกล้อง/รูปถ่ายทุกครั้งที่บันทึกสำเร็จ เพื่อบังคับถ่ายรูปใหม่เสมอ
+        retakePhoto();
 
       } else if (text.startsWith('Duplicate')) {
         showToast('⚠️ ' + text.replace('Duplicate: ', ''), 'error');
@@ -2339,6 +2359,11 @@
     loadFaceApi();  // โหลด AI model (background)
     renderHistory();
 
+    // บั๊ค (แก้แล้ว): เดิม renderDropdown() ถูกเรียกหลังลูปกู้คืนชื่อพนักงานด้านล่าง
+    // ตอนลูปทำงาน <select> จึงมีแค่ตัวเลือกว่างตัวเดียว (จาก HTML ดิบ) หาไม่เจอ
+    // savedName เลยสักครั้ง ฟีเจอร์ "จำชื่อพนักงานล่าสุด" จึงไม่เคยทำงานจริง
+    renderDropdown();
+
     // Restore last selected employee and check status
     const savedName = localStorage.getItem('saved_name');
     if (savedName) {
@@ -2352,14 +2377,12 @@
       }
     }
 
-
     // Prompt settings only if URL was manually cleared
     if (!GAS_URL) {
       setTimeout(openSettings, 800);
     }
 
     // Initial type setup
-    renderDropdown();
     setType('in');
     updateSubmitButton();
   });
