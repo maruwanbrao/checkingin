@@ -1253,7 +1253,7 @@
   let stream = null;
   let capturedImageBase64 = null;
   let selectedDeviceId = localStorage.getItem('camera_device_id') || '';
-  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbyLTKMHRp2RQci1qTQ9FIHj-K0ITeZ4GyzKPsYtTg29WpMOMpj9yWE7bgEuqsD-o1Vs/exec';
+  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbyQ79Pz5bVT4Egj--wo3is09GAPdXfhurg_SxO-fh1ZcUGrriNMeIAF_inyw54j5hKG/exec';
   let history = JSON.parse(localStorage.getItem('checkin_history') || '[]');
 
   // ============================================================
@@ -2035,6 +2035,7 @@
 
     try {
       const payload = JSON.stringify({ name, type: typeLabel, image: imageData });
+      const __clientT0 = performance.now();
       const res = await fetch(GAS_URL, {
         method: 'POST',
         body: payload,
@@ -2043,6 +2044,13 @@
       });
 
       const text = await res.text();
+      const __clientTotalMs = Math.round(performance.now() - __clientT0);
+      const __srvMatch = text.match(/srvms=(\d+)/);
+      const __srvMs = __srvMatch ? parseInt(__srvMatch[1], 10) : null;
+      console.log(
+        `[timing] client round-trip: ${__clientTotalMs}ms` +
+        (__srvMs !== null ? ` | server execution: ${__srvMs}ms | network+platform overhead: ~${__clientTotalMs - __srvMs}ms` : ' | (no server timing in response)')
+      );
       console.log('Apps Script response:', text);
 
       if (text.startsWith('Success')) {
