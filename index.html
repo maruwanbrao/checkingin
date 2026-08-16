@@ -443,9 +443,6 @@
     #toast.error { border-color: var(--accent-out); }
     .toast-icon { font-size: 18px; }
 
-    /* ===== SETTINGS MODAL ===== */
-    
-
     /* ===== HISTORY ===== */
     .history-section {
       width: 100%;
@@ -798,82 +795,6 @@
       backdrop-filter: blur(12px);
     }
 
-    /* ===== SETTINGS MODAL ===== */
-    .settings-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 300;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-      background: rgba(0,0,0,0.72);
-      backdrop-filter: blur(12px);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.25s ease;
-    }
-    .settings-overlay.open {
-      opacity: 1;
-      pointer-events: all;
-    }
-    .settings-modal {
-      width: 100%;
-      max-width: 380px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 24px;
-      box-shadow: 0 32px 80px rgba(0,0,0,0.6);
-    }
-    .settings-title {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-    .settings-desc {
-      font-size: 13px;
-      color: var(--text-dim);
-      margin-bottom: 16px;
-      line-height: 1.5;
-    }
-    .settings-input {
-      width: 100%;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px 14px;
-      color: var(--text);
-      font-family: 'Space Mono', monospace;
-      font-size: 12px;
-      outline: none;
-    }
-    .settings-input:focus { border-color: var(--accent-blue); }
-    .modal-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 18px;
-    }
-    .btn-secondary, .btn-primary {
-      flex: 1;
-      padding: 12px;
-      border: none;
-      border-radius: 10px;
-      font-family: 'Sarabun', sans-serif;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn-secondary {
-      background: var(--surface);
-      color: var(--text-dim);
-      border: 1px solid var(--border);
-    }
-    .btn-primary {
-      background: var(--accent-blue);
-      color: #0a0a0f;
-    }
-
     .popup-card {
       position: relative;
       width: 100%;
@@ -1042,10 +963,6 @@
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="clock-badge"><span id="live-clock">--:--:--</span></div>
-      <button onclick="openSettings()" title="ตั้งค่า Apps Script URL" style="
-        width:34px;height:34px;border-radius:10px;border:1px solid var(--border);
-        background:var(--card);color:var(--text-dim);cursor:pointer;
-        display:flex;align-items:center;justify-content:center;font-size:15px;">⚙️</button>
     </div>
   </header>
 
@@ -1227,24 +1144,6 @@
   <!-- Toast -->
   <div id="toast"><span class="toast-icon" id="toast-icon">✓</span><span id="toast-msg">บันทึกสำเร็จ</span></div>
 
-
-  <!-- Settings Modal -->
-  <div class="settings-overlay" id="settings-overlay">
-    <div class="settings-modal">
-      <div class="settings-title">⚙️ ตั้งค่า Apps Script URL</div>
-      <div class="settings-desc">
-        วาง Web App URL ที่ได้จากการ Deploy Google Apps Script (ลงท้ายด้วย /exec)
-        ถ้าเพิ่ง redeploy เวอร์ชันใหม่ ให้แปะ URL ล่าสุดตรงนี้
-      </div>
-      <input type="text" class="settings-input" id="gas-url-input"
-        placeholder="https://script.google.com/macros/s/XXXX/exec" />
-      <div class="modal-actions">
-        <button class="btn-secondary" onclick="closeSettings()">ยกเลิก</button>
-        <button class="btn-primary" onclick="saveSettings()">บันทึก</button>
-      </div>
-    </div>
-  </div>
-
 <script>
   // ============================================================
   // STATE
@@ -1253,45 +1152,13 @@
   let stream = null;
   let capturedImageBase64 = null;
   let selectedDeviceId = localStorage.getItem('camera_device_id') || '';
-  let GAS_URL = localStorage.getItem('gas_url') || 'https://script.google.com/macros/s/AKfycbyQ79Pz5bVT4Egj--wo3is09GAPdXfhurg_SxO-fh1ZcUGrriNMeIAF_inyw54j5hKG/exec';
+  // Apps Script Web App URL — ตายตัว ไม่มีหน้าตั้งค่าให้แก้จาก UI แล้ว
+  // (พนักงานแต่ละคนใช้เครื่องของตัวเอง ไม่จำเป็นต้องตั้งค่าต่างกันต่อเครื่อง)
+  // ⚠️ ทุกครั้งที่ redeploy Apps Script เวอร์ชันใหม่ ต้องแก้ค่านี้ให้เป็น
+  // URL ล่าสุด แล้วอัปโหลดไฟล์นี้ทับของเดิมบน GitHub Pages
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbztaOfkdabYq1bDKeYwesUpmQXJayh-tD_Mf4rW6sJ7ZbncxiLmneH3vwcdV_cwNNAY/exec';
+
   let history = JSON.parse(localStorage.getItem('checkin_history') || '[]');
-
-  // ============================================================
-  // SETTINGS MODAL (Apps Script URL)
-  // ============================================================
-  function openSettings() {
-    const input = document.getElementById('gas-url-input');
-    input.value = GAS_URL || '';
-    document.getElementById('settings-overlay').classList.add('open');
-    input.focus();
-  }
-
-  function closeSettings() {
-    document.getElementById('settings-overlay').classList.remove('open');
-  }
-
-  function saveSettings() {
-    const input = document.getElementById('gas-url-input');
-    const url = input.value.trim();
-
-    if (!url) {
-      showToast('⚠️ กรุณากรอก URL ของ Apps Script', 'error');
-      return;
-    }
-    if (!/^https:\/\/script\.google(usercontent)?\.com\/macros\/s\/.+\/exec$/.test(url)) {
-      showToast('⚠️ URL ไม่ถูกต้อง ต้องลงท้ายด้วย /exec', 'error');
-      return;
-    }
-
-    GAS_URL = url;
-    localStorage.setItem('gas_url', url);
-    closeSettings();
-    showToast('✓ บันทึก URL แล้ว', 'success');
-
-    // เช็คสถานะพนักงานที่เลือกอยู่ใหม่ด้วย URL ล่าสุด
-    const name = document.getElementById('name-input')?.value?.trim();
-    if (name) checkEmployeeStatus(name);
-  }
 
   // ============================================================
   // FACE DETECTION — TensorFlow.js BlazeFace (ทุก browser)
@@ -1613,6 +1480,27 @@
   }
 
   window.addEventListener('resize', () => { if (faceApiReady && stream) resizeFaceCanvas(); });
+
+  // ── กู้คืน face detection loop เมื่อกลับมาที่แท็บ/ปลุกหน้าจอ ──────────
+  // บั๊ค (แก้แล้ว): เดิม detectFaceLoop() เช็ค `video.paused` แล้ว return เฉยๆ
+  // โดยไม่มีใครมา requestAnimationFrame ต่อ ถ้า browser สั่ง pause วิดีโอ
+  // อัตโนมัติ (เช่น หน้าจอมือถือ/แท็บเล็ตล็อกเอง, สลับแอปแล้วกลับมา, หรือ
+  // แท็บถูก browser suspend เพื่อประหยัดแบตเตอรี่) ลูปจะตายไปเลย ทำให้
+  // faceDetected ค้างเป็น false ถาวร → ปุ่มถ่ายรูป (capture-btn) ถูก disable
+  // ค้างตลอดไป ทั้งที่ภาพจากกล้องยังแสดงปกติ พนักงานคนถัดไปจะกดถ่ายรูปไม่ได้
+  // เลย ต้องสลับกล้องหรือรีโหลดหน้าถึงจะกลับมาใช้งานได้
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && faceApiReady && stream) {
+      resizeFaceCanvas();
+      startFaceDetection();
+    }
+  });
+  window.addEventListener('focus', () => {
+    if (faceApiReady && stream) startFaceDetection();
+  });
+  document.getElementById('video-feed').addEventListener('play', () => {
+    if (faceApiReady && stream) startFaceDetection();
+  });
 
   // ============================================================
   // CLOCK
@@ -2389,11 +2277,6 @@
           break;
         }
       }
-    }
-
-    // Prompt settings only if URL was manually cleared
-    if (!GAS_URL) {
-      setTimeout(openSettings, 800);
     }
 
     // Initial type setup
