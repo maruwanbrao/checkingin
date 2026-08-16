@@ -203,6 +203,12 @@
       width: 100%; height: 100%;
       object-fit: cover;
       display: block;
+      /* Mirror ให้รู้สึกเหมือนส่องกระจก (เหมือน Zoom/FaceTime) — เป็นแค่
+         CSS transform ฝั่งแสดงผลเท่านั้น ไม่กระทบข้อมูลรูปจริงที่ถ่าย
+         เพราะ canvas.drawImage(video,...) ตอน capturePhoto() ดึงพิกเซลจาก
+         สตรีมกล้องตรงๆ ไม่ผ่าน CSS นี้ รูปที่บันทึกลง Sheet จึงยังถูกต้อง
+         ตามจริงเหมือนเดิม (ไม่ใช่ภาพกลับด้าน) */
+      transform: scaleX(-1);
     }
 
     #captured-img { display: none; }
@@ -943,6 +949,14 @@
       to   { opacity:1; transform: translateY(0); }
     }
 
+    /* keyframe แยกสำหรับรูปในป็อปอัพโดยเฉพาะ — ต้อง mirror (scaleX(-1)) ให้ตรงกับ
+       พรีวิวกล้อง แต่ห้ามใช้ keyframe "slideUp"ร่วมกับ element อื่น เพราะ
+       fill-mode:both จะทำให้ transform ตอนจบ animation ทับค่า mirror จนหายไป */
+    @keyframes slideUpMirror {
+      from { opacity:0; transform: translateY(14px) scaleX(-1); }
+      to   { opacity:1; transform: translateY(0) scaleX(-1); }
+    }
+
     /* Photo thumbnail in popup */
     .popup-photo {
       width: 64px; height: 64px;
@@ -950,7 +964,7 @@
       object-fit: cover;
       border: 2px solid var(--border);
       margin-bottom: 14px;
-      animation: slideUp 0.4s ease 0.22s both;
+      animation: slideUpMirror 0.4s ease 0.22s both;
     }
   </style>
 </head>
@@ -1173,6 +1187,7 @@
   let scanLineY         = 0;
   let scanComplete      = false;
   let lockedBox         = null;
+  let lockFailStreak    = 0; // นับจำนวนครั้งติดกันที่เช็คซ้ำแล้วไม่เจอหน้าตอน locked (กันรีเซ็ตไวเกินจากการตรวจพลาดชั่ววูบ)
 
   async function loadFaceApi() {
     const statusText = document.getElementById('face-status-text');
@@ -1256,10 +1271,24 @@
       return;
     }
 
-    // ── PHASE: locked — เจอหน้าแล้ว แสดง static box ──────────
+    // ── PHASE: locked — เจอหน้าแล้ว แสดง pulse เบาๆ ให้เห็นว่ายังทำงานอยู่ ──
     if (scanPhase === 'locked') {
       ctx.clearRect(0, 0, cw, ch);
-      // canvas ว่าง — ไม่วาดอะไร กรอบมุมกล้อง CSS ยังแสดงอยู่
+
+      // บั๊ค (แก้แล้ว): เดิม canvas ว่างเปล่าสนิทตอน locked ทำให้ scan line
+      // ที่กำลังเคลื่อนไหวอยู่หายวับไปทันทีที่ล็อกหน้าได้ ดูเหมือน animation
+      // ค้าง/หยุดชะงัก ทั้งที่จริงระบบยังทำงานปกติ (แค่ไม่มี feedback ให้เห็น)
+      // แก้โดยวาด glow เบาๆ แบบ breathing (สว่าง-หรี่วนต่อเนื่อง) แทนที่จะ
+      // ปล่อยว่าง เพื่อให้เห็นว่าเฟรมยังทำงานอยู่ ไม่ใช่ค้าง
+      const pulse = 0.5 + Math.sin(now / 500) * 0.5; // วนต่อเนื่อง ~3.1 วิ/รอบ
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = 0.18 + pulse * 0.22;
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 10 + pulse * 10;
+      ctx.strokeRect(8, 8, cw - 16, ch - 16);
+      ctx.restore();
 
       // ตรวจซ้ำทุก 800ms ว่าหน้ายังอยู่ไหม
       if (now - lastDetectTime > 800) {
@@ -1275,14 +1304,23 @@
                    (y1+y2)/2/vh>=0.20 && (y1+y2)/2/vh<=0.80;
           });
           if (valid.length === 0) {
-            // หน้าหายไป → reset scan
-            scanPhase = 'scanning'; scanLineY = 0; scanComplete = false; lockedBox = null;
-            faceDetected = false;
-            dot.className = 'face-dot';
-            statusText.textContent = 'ไม่พบใบหน้า';
-            updateCaptureButton();
-            const silR = document.getElementById('face-silhouette');
-            if (silR) silR.style.opacity = '0.18';
+            // บั๊ค (แก้แล้ว): เดิมพลาดจับหน้าแค่ครั้งเดียว (เช่น กระพริบตา/
+            // ก้มหน้าแป๊บเดียว) ก็รีเซ็ตกลับไปหน้าจอ scanning ทันที ทำให้ดู
+            // กระตุกไปมาถี่ๆ ระหว่าง "ล็อกแล้ว" กับ "สแกนใหม่" แก้โดยรอให้
+            // ไม่เจอหน้า 2 ครั้งติดกัน (~1.6 วิ) ก่อนค่อยรีเซ็ตจริง
+            lockFailStreak++;
+            if (lockFailStreak >= 2) {
+              scanPhase = 'scanning'; scanLineY = 0; scanComplete = false; lockedBox = null;
+              faceDetected = false;
+              lockFailStreak = 0;
+              dot.className = 'face-dot';
+              statusText.textContent = 'ไม่พบใบหน้า';
+              updateCaptureButton();
+              const silR = document.getElementById('face-silhouette');
+              if (silR) silR.style.opacity = '0.18';
+            }
+          } else {
+            lockFailStreak = 0;
           }
         } catch(e) {}
       }
@@ -1632,7 +1670,7 @@
     localStorage.setItem('camera_device_id', selectedDeviceId);
     capturedImageBase64 = null;
     faceDetected = false;
-    scanPhase = 'scanning'; scanLineY = 0; scanComplete = false; lockedBox = null;
+    scanPhase = 'scanning'; scanLineY = 0; scanComplete = false; lockedBox = null; lockFailStreak = 0;
     document.getElementById('retake-btn').classList.remove('visible');
     document.getElementById('capture-btn').style.display = 'flex';
     document.getElementById('photo-hint').style.display  = 'flex';
@@ -1693,7 +1731,7 @@
   function retakePhoto() {
     capturedImageBase64 = null;
     faceDetected = false;
-    scanPhase = 'scanning'; scanLineY = 0; scanComplete = false; lockedBox = null;
+    scanPhase = 'scanning'; scanLineY = 0; scanComplete = false; lockedBox = null; lockFailStreak = 0;
     const silRet = document.getElementById('face-silhouette');
     if (silRet) silRet.style.opacity = '0.18';
     const video = document.getElementById('video-feed');
@@ -1735,7 +1773,7 @@
     }
 
     if (faceApiReady && stream) {
-      scanPhase = 'scanning'; scanLineY = 0; scanComplete = false; lockedBox = null; faceDetected = false;
+      scanPhase = 'scanning'; scanLineY = 0; scanComplete = false; lockedBox = null; faceDetected = false; lockFailStreak = 0;
       const silSt = document.getElementById('face-silhouette');
       if (silSt) silSt.style.opacity = '0.18';
       startFaceDetection();
