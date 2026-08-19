@@ -1540,6 +1540,22 @@
     if (faceApiReady && stream) startFaceDetection();
   });
 
+  // ── Watchdog: กู้ loop เผื่อกรณีไม่มี event ไหนมาปลุกเลย ────────────
+  // เดิมพึ่งแค่ visibilitychange/focus/play event ซึ่งครอบคลุมเคสหลัก
+  // แล้ว แต่บาง WebView บนมือถือ (เช่น ในแอปแชทบางตัว) throttle
+  // requestAnimationFrame แบบเงียบๆ โดยไม่ fire event เหล่านี้เลย
+  // เช็คทุก 4 วิ ว่า loop ควรวิ่งอยู่แต่ไม่วิ่ง แล้วกู้คืนให้ — ป้องกัน
+  // ปุ่มถ่ายรูปค้าง disabled ถาวรเหมือนบั๊คเดิมที่เคยแก้ไปแล้ว
+  setInterval(() => {
+    const video = document.getElementById('video-feed');
+    if (stream && faceApiReady && video && !video.paused &&
+        video.style.display !== 'none' && !faceDetectionLoop) {
+      console.warn('[watchdog] face detection loop หยุดกลางทาง — กู้คืน');
+      resizeFaceCanvas();
+      startFaceDetection();
+    }
+  }, 4000);
+
   // ============================================================
   // CLOCK
   // ============================================================
@@ -1823,9 +1839,15 @@
   // ============================================================
   let todayStatus = { checkin: false, checkout: false };
   let statusCheckTimeout = null;
+  let statusRequestId = 0;
+  // บั๊ค (แก้แล้ว): เดิมถ้าเปลี่ยนพนักงาน 2 คนเร็วๆ ก่อน fetch ของคนแรก
+  // ตอบกลับ (เช่น เน็ตช้าจังหวะนั้น) response ที่มาช้ากว่าจะทับ todayStatus
+  // ของคนที่เพิ่งเลือกไป ทำให้ chip/ปุ่มบันทึกโชว์สถานะผิดคน — ใช้
+  // statusRequestId ทิ้ง response ที่ไม่ใช่ของ request ล่าสุดแทน
 
   async function checkEmployeeStatus(name) {
     if (!name || !GAS_URL) return;
+    const myRequestId = ++statusRequestId;
 
     const bar = document.getElementById('status-bar');
     const chipIn  = document.getElementById('chip-in');
@@ -1844,12 +1866,15 @@
       const res = await fetch(url, { method: 'GET', redirect: 'follow' });
       const text = await res.text();
       const data = JSON.parse(text);
+      if (myRequestId !== statusRequestId) return; // มีการเปลี่ยนพนักงานไปแล้ว ทิ้งผลลัพธ์อันนี้
       todayStatus = data;
     } catch (err) {
+      if (myRequestId !== statusRequestId) return;
       console.warn('checkEmployeeStatus error:', err);
       // ถ้าเช็คไม่ได้ ให้ผ่านไปก่อน
       todayStatus = { checkin: false, checkout: false };
     }
+    if (myRequestId !== statusRequestId) return; // กันอัปเดต UI ผิดคนด้วย
 
     // อัปเดต UI chip
     chipIn.className  = todayStatus.checkin  ? 'status-chip done-in'  : 'status-chip';
