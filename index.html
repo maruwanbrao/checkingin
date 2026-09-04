@@ -441,12 +441,7 @@
       z-index: 100;
       box-shadow: 0 16px 48px rgba(0,0,0,0.4);
       transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
-      /* บั๊ค (แก้แล้ว): เดิม white-space:nowrap ทำให้ข้อความ error ยาวๆ
-         (เช่น ข้อความจาก Apps Script) ล้นออกนอกจอบนมือถือจนอ่านไม่ได้
-         เปลี่ยนเป็นจำกัดความกว้างแล้วให้ตัดบรรทัดเองแทน */
-      max-width: min(90vw, 460px);
-      text-align: left;
-      line-height: 1.45;
+      white-space: nowrap;
     }
 
     #toast.show { transform: translateX(-50%) translateY(0); }
@@ -1177,15 +1172,7 @@
   // URL ล่าสุด แล้วอัปโหลดไฟล์นี้ทับของเดิมบน GitHub Pages
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbztaOfkdabYq1bDKeYwesUpmQXJayh-tD_Mf4rW6sJ7ZbncxiLmneH3vwcdV_cwNNAY/exec';
 
-  // บั๊ค (แก้แล้ว): เดิมประกาศ `let history` ที่ระดับบนสุดของสคริปต์ ซึ่ง "บัง"
-  // window.history (History API ของ browser) ทั้งหน้า ถ้าวันหลังมีการเพิ่มโค้ด/
-  // ไลบรารีที่เรียก history.pushState() หรือ history.back() จะพังทันทีแบบหาสาเหตุยาก
-  // เปลี่ยนชื่อเป็น checkinHistory ให้ชัดเจนว่าเป็นของแอปนี้เอง
-  let checkinHistory = [];
-  try {
-    const rawHist = JSON.parse(localStorage.getItem('checkin_history') || '[]');
-    checkinHistory = Array.isArray(rawHist) ? rawHist : [];
-  } catch (e) { checkinHistory = []; }
+  let history = JSON.parse(localStorage.getItem('checkin_history') || '[]');
 
   // ============================================================
   // FACE DETECTION — TensorFlow.js BlazeFace (ทุก browser)
@@ -1201,16 +1188,6 @@
   let scanComplete      = false;
   let lockedBox         = null;
   let lockFailStreak    = 0; // นับจำนวนครั้งติดกันที่เช็คซ้ำแล้วไม่เจอหน้าตอน locked (กันรีเซ็ตไวเกินจากการตรวจพลาดชั่ววูบ)
-  let lastFrameTime     = 0; // เวลาเฟรมก่อนหน้า ใช้คำนวณความเร็ว scan line ให้เท่ากันทุกอัตรารีเฟรช
-
-  // บั๊ค (แก้แล้ว - สำคัญ): เดิมกู้ลูปด้วยการเรียก startFaceDetection() ซ้ำได้ไม่จำกัด
-  // และ cancelAnimationFrame() ยกเลิกได้แค่ "เฟรมที่จองไว้" เท่านั้น ยกเลิกลูปที่กำลัง
-  // ค้างอยู่ที่ await (estimateFaces / setTimeout 800ms) ไม่ได้ ผลคือถ้า event
-  // visibilitychange + focus + play + watchdog มาใกล้ๆ กัน (ซึ่งเกิดประจำตอนสลับแอป
-  // กลับมา) จะได้ลูปวิ่งขนานกัน 2-4 ตัว ทั้งหมดวาดลง canvas เดียวกัน = scan line
-  // กระตุกวิ่งซ้อนกัน, ยิง TensorFlow ซ้ำหลายเท่า, กินแบตและ CPU เกินจำเป็น
-  // แก้ด้วย "เลขรุ่นของลูป": ลูปเก่าที่ตื่นจาก await มาแล้วเห็นว่าเลขรุ่นไม่ตรง จะจบตัวเองทันที
-  let faceLoopGen = 0;
 
   async function loadFaceApi() {
     const statusText = document.getElementById('face-status-text');
@@ -1255,70 +1232,32 @@
     }
   }
 
-  // ปรับปรุง: รองรับจอความละเอียดสูง (retina / มือถือ) — เดิมตั้งขนาด canvas เป็น
-  // CSS pixel ตรงๆ แล้วปล่อยให้ browser ขยายภาพขึ้น ทำให้เส้น scan และกรอบเบลอ
-  // ตอนนี้วาดที่ความละเอียดจริงของอุปกรณ์ แล้ว scale context กลับมาเป็นหน่วย CSS
-  // (โค้ดวาดทั้งหมดจึงยังคิดพิกัดเป็น CSS pixel เหมือนเดิม ไม่ต้องแก้ตาม)
   function resizeFaceCanvas() {
     const canvas = document.getElementById('face-canvas');
     const frame  = document.getElementById('camera-frame');
-    if (!canvas || !frame) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2); // เกิน 2 ไม่คุ้มค่า GPU
-    const cssW = frame.clientWidth, cssH = frame.clientHeight;
-    if (!cssW || !cssH) return;
-    canvas.width  = Math.round(cssW * dpr);
-    canvas.height = Math.round(cssH * dpr);
-    canvas.style.width  = cssW + 'px';
-    canvas.style.height = cssH + 'px';
-    const ctx = canvas.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-
-  // ขนาดพื้นที่วาดในหน่วย CSS pixel (หลัง setTransform แล้วต้องใช้ค่านี้ ไม่ใช่ canvas.width)
-  function canvasCssSize(canvas) {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    return { w: canvas.width / dpr, h: canvas.height / dpr };
+    canvas.width  = frame.clientWidth;
+    canvas.height = frame.clientHeight;
   }
 
   function startFaceDetection() {
     if (faceDetectionLoop) cancelAnimationFrame(faceDetectionLoop);
-    faceDetectionLoop = null;
-    const gen = ++faceLoopGen; // ลูปเก่าทุกตัวถือว่าหมดอายุทันที
-    lastFrameTime = 0;
-    detectFaceLoop(gen);
+    detectFaceLoop();
   }
 
   function stopFaceDetection() {
-    faceLoopGen++; // ทำให้ลูปที่ค้างอยู่ที่ await จบตัวเองตอนตื่นขึ้นมา
-    if (faceDetectionLoop) { cancelAnimationFrame(faceDetectionLoop); }
-    faceDetectionLoop = null;
+    if (faceDetectionLoop) { cancelAnimationFrame(faceDetectionLoop); faceDetectionLoop = null; }
     const canvas = document.getElementById('face-canvas');
-    if (canvas) {
-      const sz = canvasCssSize(canvas);
-      canvas.getContext('2d').clearRect(0, 0, sz.w, sz.h);
-    }
+    if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
     lastDetections = [];
   }
 
-  // ⚠️ ทุกทางออกของฟังก์ชันนี้ "ต้อง" เคลียร์ faceDetectionLoop = null เสมอ
-  // บั๊ค (แก้แล้ว - ร้ายแรงที่สุดในไฟล์นี้): เดิมทางออกก่อนกำหนด (บรรทัด guard ด้านล่าง)
-  // แค่ return เฉยๆ โดยไม่แตะ faceDetectionLoop ซึ่งยังค้างเป็นเลข id ของเฟรมเก่าอยู่
-  // ผลคือ watchdog ที่เขียนไว้กู้ลูป (เช็คเงื่อนไข !faceDetectionLoop) มองว่า "ลูปยังวิ่งอยู่"
-  // ตลอดไป จึงไม่เคยกู้ให้เลยแม้แต่ครั้งเดียว = ปุ่มถ่ายรูปค้าง disabled ถาวรเหมือนบั๊คเดิม
-  // ที่ watchdog ตั้งใจจะแก้ (ตัว watchdog ทำงานอยู่ แต่เงื่อนไขไม่มีวันเป็นจริง)
-  async function detectFaceLoop(gen) {
-    if (gen !== faceLoopGen) { return; } // ลูปรุ่นเก่า - จบตัวเองเงียบๆ ห้ามแตะ faceDetectionLoop
-
+  async function detectFaceLoop() {
     const video  = document.getElementById('video-feed');
     const canvas = document.getElementById('face-canvas');
-    if (!stream || !video || !canvas || video.paused || video.ended || !faceApiReady || video.style.display === 'none') {
-      faceDetectionLoop = null; // ← หัวใจของการแก้บั๊ค: บอก watchdog ว่าลูปตายแล้ว
-      return;
-    }
+    if (!stream || !video || video.paused || video.ended || !faceApiReady || video.style.display === 'none') return;
 
     const ctx = canvas.getContext('2d');
-    const sz = canvasCssSize(canvas);
-    const cw = sz.w, ch = sz.h;
+    const cw = canvas.width, ch = canvas.height;
     const now = Date.now();
     const statusText = document.getElementById('face-status-text');
     const dot        = document.getElementById('face-dot');
@@ -1328,7 +1267,7 @@
     if (!faceModel) {
       ctx.clearRect(0, 0, cw, ch);
       drawScanOverlay(ctx, cw, ch, now);
-      faceDetectionLoop = requestAnimationFrame(function () { detectFaceLoop(gen); });
+      faceDetectionLoop = requestAnimationFrame(detectFaceLoop);
       return;
     }
 
@@ -1339,7 +1278,9 @@
       // บั๊ค (แก้แล้ว): เดิม canvas ว่างเปล่าสนิทตอน locked ทำให้ scan line
       // ที่กำลังเคลื่อนไหวอยู่หายวับไปทันทีที่ล็อกหน้าได้ ดูเหมือน animation
       // ค้าง/หยุดชะงัก ทั้งที่จริงระบบยังทำงานปกติ (แค่ไม่มี feedback ให้เห็น)
-      const pulse = 0.5 + Math.sin(now / 500) * 0.5;
+      // แก้โดยวาด glow เบาๆ แบบ breathing (สว่าง-หรี่วนต่อเนื่อง) แทนที่จะ
+      // ปล่อยว่าง เพื่อให้เห็นว่าเฟรมยังทำงานอยู่ ไม่ใช่ค้าง
+      const pulse = 0.5 + Math.sin(now / 500) * 0.5; // วนต่อเนื่อง ~3.1 วิ/รอบ
       ctx.save();
       ctx.strokeStyle = color;
       ctx.globalAlpha = 0.18 + pulse * 0.22;
@@ -1353,8 +1294,15 @@
       if (now - lastDetectTime > 800) {
         lastDetectTime = now;
         try {
-          const valid = await detectValidFaces(video);
-          if (gen !== faceLoopGen) return; // ระหว่างรอผล มีการ stop/restart ไปแล้ว
+          const vw = video.videoWidth||640, vh = video.videoHeight||480;
+          const minSize = vh * 0.20;
+          const preds = await faceModel.estimateFaces(video, false);
+          const valid = (preds||[]).filter(p => {
+            const s=p.probability?.[0]||0, x1=p.topLeft[0], y1=p.topLeft[1], x2=p.bottomRight[0], y2=p.bottomRight[1];
+            return s>=0.88 && (x2-x1)>=minSize && (y2-y1)>=minSize &&
+                   (x1+x2)/2/vw>=0.15 && (x1+x2)/2/vw<=0.85 &&
+                   (y1+y2)/2/vh>=0.20 && (y1+y2)/2/vh<=0.80;
+          });
           if (valid.length === 0) {
             // บั๊ค (แก้แล้ว): เดิมพลาดจับหน้าแค่ครั้งเดียว (เช่น กระพริบตา/
             // ก้มหน้าแป๊บเดียว) ก็รีเซ็ตกลับไปหน้าจอ scanning ทันที ทำให้ดู
@@ -1365,10 +1313,6 @@
               scanPhase = 'scanning'; scanLineY = 0; scanComplete = false; lockedBox = null;
               faceDetected = false;
               lockFailStreak = 0;
-              // บั๊ค (แก้แล้ว): เดิมไม่ล้าง lastDetections ตรงนี้ ทำให้ค่าค้างเป็น
-              // "เคยเจอหน้า" ทั้งที่เพิ่งตัดสินว่าไม่เจอแล้ว — capturePhoto() ใช้ค่านี้
-              // เป็นด่านตรวจชั้นที่ 2 จึงกลายเป็นด่านที่เชื่อถือไม่ได้
-              lastDetections = [];
               dot.className = 'face-dot';
               statusText.textContent = 'ไม่พบใบหน้า';
               updateCaptureButton();
@@ -1377,26 +1321,16 @@
             }
           } else {
             lockFailStreak = 0;
-            lastDetections = valid;
           }
-        } catch(e) {
-          if (gen !== faceLoopGen) return;
-        }
+        } catch(e) {}
       }
-      faceDetectionLoop = requestAnimationFrame(function () { detectFaceLoop(gen); });
+      faceDetectionLoop = requestAnimationFrame(detectFaceLoop);
       return;
     }
 
     // ── PHASE: scanning — วิ่ง scan line จากบนลงล่าง ──────────
     ctx.clearRect(0, 0, cw, ch);
-
-    // ปรับปรุง: เดิม scanLineY += 4 ต่อ "เฟรม" ซึ่งผูกกับอัตรารีเฟรชของจอโดยตรง
-    // จอ 120Hz (มือถือรุ่นใหม่จำนวนมาก) เส้นจะวิ่งเร็วเป็น 2 เท่าของที่ออกแบบไว้
-    // และเครื่องที่ค้าง/โหลดหนักจะวิ่งช้าลง = ความเร็วสแกนไม่เท่ากันในแต่ละเครื่อง
-    // ตอนนี้คิดจากเวลาจริงที่ผ่านไป (240 CSS px/วินาที ≈ ของเดิมที่ 60fps)
-    const dt = lastFrameTime ? Math.min((now - lastFrameTime) / 1000, 0.1) : 1 / 60;
-    lastFrameTime = now;
-    scanLineY += 240 * dt;
+    scanLineY += 4;
 
     // scan line gradient
     if (scanLineY < ch + 30) {
@@ -1415,8 +1349,15 @@
       lastDetectTime = now;
       scanComplete = true;
       try {
-        const valid = await detectValidFaces(video);
-        if (gen !== faceLoopGen) return;
+        const vw = video.videoWidth||640, vh = video.videoHeight||480;
+        const minSize = vh * 0.20;
+        const preds = await faceModel.estimateFaces(video, false);
+        const valid = (preds||[]).filter(p => {
+          const s=p.probability?.[0]||0, x1=p.topLeft[0], y1=p.topLeft[1], x2=p.bottomRight[0], y2=p.bottomRight[1];
+          return s>=0.88 && (x2-x1)>=minSize && (y2-y1)>=minSize &&
+                 (x1+x2)/2/vw>=0.15 && (x1+x2)/2/vw<=0.85 &&
+                 (y1+y2)/2/vh>=0.20 && (y1+y2)/2/vh<=0.80;
+        });
         lastDetections = valid;
 
         if (valid.length > 0) {
@@ -1432,10 +1373,7 @@
             landmarks: (p.landmarks||[]).map(([lx,ly])=>[lx*sx, ly*sy])
           };
         }
-      } catch(e) {
-        if (gen !== faceLoopGen) return;
-        lastDetections = [];
-      }
+      } catch(e) { lastDetections = []; }
     }
 
     // scan line วิ่งจบ → ประเมินผล
@@ -1452,57 +1390,61 @@
         if (sil) sil.style.opacity = '0';
       } else {
         // ❌ ไม่พบ → รอ 800ms แล้ว scan ใหม่
-        let rawCount = 0;
-        try {
-          const rawPreds = await faceModel.estimateFaces(video, false);
-          rawCount = (rawPreds || []).length;
-        } catch (e) { rawCount = 0; }
-        if (gen !== faceLoopGen) return;
-        statusText.textContent = rawCount > 0
+        const rawPreds = await faceModel.estimateFaces(video, false).catch(()=>[]);
+        statusText.textContent = rawPreds.length > 0
           ? 'ขยับหน้าเข้ากล้อง / ให้อยู่กลางภาพ'
           : 'ไม่พบใบหน้า';
         dot.className = 'face-dot';
         faceDetected = false;
         updateCaptureButton();
         await new Promise(r => setTimeout(r, 800));
-        // บั๊ค (แก้แล้ว): เดิมระหว่างหลับ 800ms นี้ ถ้าผู้ใช้กดถ่ายรูป (capturePhoto →
-        // stopFaceDetection) ลูปตัวนี้จะตื่นขึ้นมาแล้วจอง requestAnimationFrame ต่อ
-        // = ลูปที่ "สั่งหยุดไปแล้ว" ฟื้นคืนชีพ แล้วเขียนทับ faceDetectionLoop ด้วย id
-        // ที่ค้าง ทำให้ watchdog เพี้ยนตามไปด้วย — เช็คเลขรุ่นก่อนเสมอ
-        if (gen !== faceLoopGen) return;
         scanLineY = 0; scanComplete = false; lastDetections = [];
-        lastFrameTime = 0;
       }
     }
 
-    faceDetectionLoop = requestAnimationFrame(function () { detectFaceLoop(gen); });
+    faceDetectionLoop = requestAnimationFrame(detectFaceLoop);
   }
 
-  // แยกเงื่อนไข "ใบหน้าที่ยอมรับได้" ออกมาเป็นที่เดียว
-  // ปรับปรุง: เดิมโค้ดชุดนี้ถูกคัดลอกวางไว้ 2 ที่ (เฟส locked กับเฟส scanning) แบบเป๊ะๆ
-  // ถ้าวันหลังปรับเกณฑ์ความมั่นใจหรือขนาดหน้าแล้วแก้แค่ที่เดียว จะได้พฤติกรรม 2 แบบ
-  // ในระบบเดียวกันโดยไม่มีอะไรฟ้อง
-  async function detectValidFaces(video) {
-    const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
-    const minSize = vh * 0.20;
-    const preds = await faceModel.estimateFaces(video, false);
-    return (preds || []).filter(p => {
-      const s = p.probability?.[0] || 0;
-      const x1 = p.topLeft[0], y1 = p.topLeft[1], x2 = p.bottomRight[0], y2 = p.bottomRight[1];
-      return s >= 0.88 && (x2-x1) >= minSize && (y2-y1) >= minSize &&
-             (x1+x2)/2/vw >= 0.15 && (x1+x2)/2/vw <= 0.85 &&
-             (y1+y2)/2/vh >= 0.20 && (y1+y2)/2/vh <= 0.80;
+  // วาด locked box แบบ static ไม่กระพริบ
+  function drawLockedBox(ctx, box, color) {
+    const {x, y, w, h, score, landmarks} = box;
+    const cLen = Math.min(w,h) * 0.22;
+    ctx.save();
+    // border จาง
+    ctx.strokeStyle = color + '40';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, h);
+    // corner brackets
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 8;
+    ctx.lineCap = 'round';
+    [[x,y,1,1],[x+w,y,-1,1],[x,y+h,1,-1],[x+w,y+h,-1,-1]].forEach(([cx,cy,dx,dy])=>{
+      ctx.beginPath();
+      ctx.moveTo(cx+dx*cLen,cy); ctx.lineTo(cx,cy); ctx.lineTo(cx,cy+dy*cLen);
+      ctx.stroke();
     });
+    // badge
+    ctx.shadowBlur = 0;
+    ctx.font = 'bold 10px "Space Mono",monospace';
+    const label = `FACE  ${score}%`;
+    const tw = ctx.measureText(label).width;
+    const bx = x+w/2-tw/2-6, by = y-20;
+    ctx.fillStyle = color + 'dd';
+    if (ctx.roundRect) ctx.roundRect(bx,by,tw+12,16,3); else ctx.rect(bx,by,tw+12,16);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.fillText(label, bx+6, by+11);
+    // landmarks
+    if (landmarks?.length) {
+      ctx.fillStyle = color; ctx.globalAlpha = 0.8;
+      landmarks.forEach(([lx,ly])=>{ ctx.beginPath(); ctx.arc(lx,ly,2.5,0,Math.PI*2); ctx.fill(); });
+    }
+    ctx.restore();
   }
 
-  // หมายเหตุ: ฟังก์ชัน drawLockedBox() และ drawFaceBox() ถูกลบออกแล้ว (โค้ดตาย ~100 บรรทัด)
-  // ทั้งสองตัวไม่เคยถูกเรียกจากที่ไหนเลยตั้งแต่เปลี่ยนมาใช้เฟส locked แบบ pulse
-  // และที่สำคัญกว่านั้นคือ "ถ้าเผลอเรียกกลับมาใช้จะวาดผิดตำแหน่ง" 2 ชั้นซ้อน:
-  //   1) วิดีโอถูก mirror ด้วย CSS (scaleX(-1)) แต่ canvas ไม่ได้ mirror ตาม
-  //      กรอบจึงไปโผล่คนละฝั่งกับหน้าที่ผู้ใช้เห็นบนจอ
-  //   2) วิดีโอใช้ object-fit:cover (ครอบตัดภาพ) แต่โค้ดคำนวณสเกลแบบยืดเต็มกรอบ
-  //      (cw/videoWidth) ซึ่งใช้ได้เฉพาะกรณีอัตราส่วนภาพตรงกับกรอบ 4:3 พอดีเท่านั้น
-  // เก็บบันทึกไว้ตรงนี้เพื่อไม่ให้มีใครนำกลับมาใช้โดยไม่แก้ 2 ข้อนี้ก่อน
+
 
   function drawScanOverlay(ctx, cw, ch, now) {
     const color = currentType === 'in' ? '#00e5a0' : '#ff4d6d';
@@ -1529,13 +1471,53 @@
     // วาด face guide แทน reticle
   }
 
-  // ปรับปรุง: หน่วงการคำนวณขนาดใหม่ เพราะบนมือถือ event resize ยิงรัวมากตอนหมุนจอ
-  // หรือตอนแถบ address bar ยุบ/ขยาย — เดิมคำนวณใหม่ทุกครั้งโดยไม่จำเป็น
-  let resizeTimer = null;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => { if (faceApiReady && stream) resizeFaceCanvas(); }, 150);
-  });
+  function drawFaceBox(ctx, x, y, w, h, now, score) {
+    const color = currentType === 'in' ? '#00e5a0' : '#ff4d6d';
+    const pulse = 0.75 + Math.sin(now/380)*0.25;
+    const cLen  = Math.min(w, h) * 0.22;
+
+    // scan line
+    const scanY = y + ((now/5) % h);
+    const sg = ctx.createLinearGradient(x, scanY-16, x, scanY+16);
+    sg.addColorStop(0,'transparent'); sg.addColorStop(0.5, color+'44'); sg.addColorStop(1,'transparent');
+    ctx.fillStyle = sg;
+    ctx.fillRect(x, Math.max(y, scanY-16), w, 32);
+
+    // glow border
+    ctx.save();
+    ctx.shadowColor = color; ctx.shadowBlur = 16*pulse;
+    ctx.strokeStyle = color+'55'; ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, h);
+    ctx.restore();
+
+    // corner brackets
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+    ctx.shadowColor = color; ctx.shadowBlur = 12*pulse;
+    ctx.lineCap = 'round';
+    [[x,y,1,1],[x+w,y,-1,1],[x,y+h,1,-1],[x+w,y+h,-1,-1]].forEach(([cx,cy,dx,dy]) => {
+      ctx.beginPath();
+      ctx.moveTo(cx+dx*cLen,cy); ctx.lineTo(cx,cy); ctx.lineTo(cx,cy+dy*cLen);
+      ctx.stroke();
+    });
+    ctx.restore();
+
+    // badge
+    ctx.save();
+    ctx.font = 'bold 10px "Space Mono",monospace';
+    const label = `FACE  ${score}%`;
+    const tw = ctx.measureText(label).width;
+    const bx = x+w/2-tw/2-6, by = y-20;
+    ctx.fillStyle = color+'dd';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx,by,tw+12,16,3); else ctx.rect(bx,by,tw+12,16);
+    ctx.fill();
+    ctx.fillStyle = '#000a';
+    ctx.fillText(label, bx+6, by+11);
+    ctx.restore();
+  }
+
+  window.addEventListener('resize', () => { if (faceApiReady && stream) resizeFaceCanvas(); });
 
   // ── กู้คืน face detection loop เมื่อกลับมาที่แท็บ/ปลุกหน้าจอ ──────────
   // บั๊ค (แก้แล้ว): เดิม detectFaceLoop() เช็ค `video.paused` แล้ว return เฉยๆ
@@ -1564,9 +1546,6 @@
   // requestAnimationFrame แบบเงียบๆ โดยไม่ fire event เหล่านี้เลย
   // เช็คทุก 4 วิ ว่า loop ควรวิ่งอยู่แต่ไม่วิ่ง แล้วกู้คืนให้ — ป้องกัน
   // ปุ่มถ่ายรูปค้าง disabled ถาวรเหมือนบั๊คเดิมที่เคยแก้ไปแล้ว
-  // ⚠️ watchdog นี้จะทำงานได้ก็ต่อเมื่อ detectFaceLoop เคลียร์ faceDetectionLoop = null
-  // ทุกครั้งที่จบลูป (ดูคอมเมนต์ที่หัวฟังก์ชันนั้น) — ก่อนหน้านี้มันไม่เคยเคลียร์ เงื่อนไข
-  // ตรงนี้จึงไม่มีวันเป็นจริง = watchdog มีอยู่แต่ไม่เคยกู้อะไรได้เลย
   setInterval(() => {
     const video = document.getElementById('video-feed');
     if (stream && faceApiReady && video && !video.paused &&
@@ -1577,17 +1556,12 @@
     }
   }, 4000);
 
-  // ปรับปรุง: เช็คสถานะพนักงานใหม่เมื่อกลับมาที่หน้าจอ
-  // บั๊ค (แก้แล้ว): เดิม todayStatus ถูกดึงครั้งเดียวตอนเลือกชื่อ แล้วไม่เคยดึงซ้ำอีก
-  // อาการจริง: เปิดหน้านี้ค้างไว้ข้ามคืน (จอแท็บเล็ตหน้าออฟฟิศเป็นแบบนี้เกือบทุกเครื่อง)
-  // พอเช้าวันใหม่มาสแกนเข้างาน ปุ่มยังขึ้น "✓ Check-in วันนี้แล้ว" จากข้อมูลของ "เมื่อวาน"
-  // ทำให้กดบันทึกไม่ได้ทั้งที่ยังไม่ได้เข้างานวันนี้ ต้องรีโหลดหน้าถึงจะใช้ได้
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) return;
-    const name = document.getElementById('name-input').value.trim();
-    if (name) checkEmployeeStatus(name);
-  });
-
+  // ============================================================
+  // CLOCK
+  // ============================================================
+  // ============================================================
+  // CLOCK
+  // ============================================================
   // ============================================================
   // CLOCK
   // ============================================================
@@ -1629,9 +1603,6 @@
         const chosen = physicalCam || videoDevices[0];
         selectedDeviceId = chosen.deviceId;
         sel.value = selectedDeviceId;
-        // ปรับปรุง: เดิมเลือกกล้องให้แล้วแต่ไม่ได้บันทึกลง localStorage
-        // ทำให้ต้องมาไล่เลือกใหม่ทุกครั้งที่เปิดหน้า และผลอาจไม่เหมือนเดิมทุกรอบ
-        if (selectedDeviceId) localStorage.setItem('camera_device_id', selectedDeviceId);
       }
     } catch(e) { console.warn('enumerateDevices:', e); }
   }
@@ -1711,12 +1682,8 @@
 
   async function switchCamera() {
     const sel = document.getElementById('camera-select');
-    // ปรับปรุง: เดิมบันทึกค่าว่างทับของเดิมได้ (เช่นตอน dropdown ยังเป็น "กำลังค้นหากล้อง...")
-    // ทำให้ค่ากล้องที่เคยจำไว้หายไปเฉยๆ
-    if (!sel.value) return;
     selectedDeviceId = sel.value;
     localStorage.setItem('camera_device_id', selectedDeviceId);
-    stopFaceDetection();
     capturedImageBase64 = null;
     faceDetected = false;
     scanPhase = 'scanning'; scanLineY = 0; scanComplete = false; lockedBox = null; lockFailStreak = 0;
@@ -1750,14 +1717,6 @@
       }
     }
 
-    // บั๊ค (แก้แล้ว): เดิมไม่เช็คว่าวิดีโอมีเฟรมจริงหรือยัง ถ้ากดถ่ายจังหวะที่กล้องเพิ่งเปิด
-    // (videoWidth ยังเป็น 0) canvas จะได้ภาพดำล้วน แล้วรูปดำนั้นถูกอัปโหลดขึ้น Sheet จริงๆ
-    // โดยไม่มีอะไรเตือน — ตรวจแล้วบอกให้รอสักครู่ดีกว่าปล่อยรูปเสียเข้าระบบ
-    if (!video.videoWidth || !video.videoHeight || video.readyState < 2) {
-      showToast('📷 กล้องยังไม่พร้อม กรุณารอสักครู่', 'error');
-      return;
-    }
-
     // ลดขนาดรูปก่อนส่ง เพื่อให้อัปโหลดเร็วขึ้น (รูปสำหรับบันทึกยืนยันตัวตน
     // ไม่จำเป็นต้องละเอียดเต็มความละเอียดกล้อง — กว้างไม่เกิน 480px ก็ชัดพอ)
     const MAX_UPLOAD_WIDTH = 480;
@@ -1771,14 +1730,6 @@
 
     // Compress to reasonable size for sending to Apps Script
     capturedImageBase64 = canvas.toDataURL('image/jpeg', 0.5);
-
-    // ตาข่ายกันรูปเสีย: บาง browser คืน data:, เปล่าๆ ถ้า canvas ถูก taint หรือหน่วยความจำไม่พอ
-    // ถ้าปล่อยผ่าน จะได้ปุ่มบันทึกที่กดได้แต่ส่งรูปว่างขึ้นไป
-    if (!capturedImageBase64 || capturedImageBase64.length < 1000) {
-      capturedImageBase64 = null;
-      showToast('📷 บันทึกรูปไม่สำเร็จ กรุณาลองใหม่', 'error');
-      return;
-    }
 
     img.src = capturedImageBase64;
     img.style.display = 'block';
@@ -1839,15 +1790,10 @@
 
     if (faceApiReady && stream) {
       scanPhase = 'scanning'; scanLineY = 0; scanComplete = false; lockedBox = null; faceDetected = false; lockFailStreak = 0;
-      lastDetections = [];
       const silSt = document.getElementById('face-silhouette');
       if (silSt) silSt.style.opacity = '0.18';
       startFaceDetection();
     }
-    // บั๊ค (แก้แล้ว): เดิมสลับเข้างาน/ออกงานแล้วรีเซ็ต faceDetected = false แต่ไม่ได้
-    // อัปเดตปุ่มถ่ายรูปตาม ต้องรอให้ลูปตรวจจับวนมาอัปเดตให้เอง — ถ้ากล้องยังไม่พร้อม
-    // (หรือ model โหลดไม่สำเร็จ) ปุ่มจะค้างในสถานะของโหมดก่อนหน้า
-    updateCaptureButton();
     const btnIn = document.getElementById('btn-checkin');
     const btnOut = document.getElementById('btn-checkout');
     const frame = document.getElementById('camera-frame');
@@ -1894,12 +1840,6 @@
   let todayStatus = { checkin: false, checkout: false };
   let statusCheckTimeout = null;
   let statusRequestId = 0;
-  let statusFetchedForDate = ''; // วันที่ (ตามเครื่อง) ที่ดึงสถานะนี้มา — ใช้กันข้อมูลข้ามวัน
-
-  function todayKey() {
-    const d = new Date();
-    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
-  }
   // บั๊ค (แก้แล้ว): เดิมถ้าเปลี่ยนพนักงาน 2 คนเร็วๆ ก่อน fetch ของคนแรก
   // ตอบกลับ (เช่น เน็ตช้าจังหวะนั้น) response ที่มาช้ากว่าจะทับ todayStatus
   // ของคนที่เพิ่งเลือกไป ทำให้ chip/ปุ่มบันทึกโชว์สถานะผิดคน — ใช้
@@ -1922,38 +1862,17 @@
     chipOutTxt.textContent = 'กำลังตรวจสอบ...';
 
     try {
-      // ปรับปรุง 3 อย่างในคำขอนี้:
-      // 1) ต่อ _ts เพื่อกัน browser/proxy จำคำตอบเก่าไว้ (GET ที่ URL เดิมเป๊ะถูกแคชได้ง่ายมาก
-      //    ผลคือคนที่เพิ่ง check-in สำเร็จบนอีกเครื่อง ยังเห็นสถานะเก่าอยู่)
-      // 2) cache:'no-store' ย้ำอีกชั้นสำหรับ browser ที่เคารพ header นี้
-      // 3) ตั้ง timeout 15 วิ — เดิมถ้า Apps Script ค้าง คำขอจะค้างไปเรื่อยๆ ไม่มีวันจบ
-      //    ชิป "กำลังตรวจสอบ..." ก็หมุนค้างตลอดไปโดยไม่มีอะไรบอกผู้ใช้
-      const url = GAS_URL + '?action=status&name=' + encodeURIComponent(name) + '&_ts=' + Date.now();
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 15000);
-      let text;
-      try {
-        const res = await fetch(url, { method: 'GET', redirect: 'follow', cache: 'no-store', signal: ctrl.signal });
-        text = await res.text();
-      } finally {
-        clearTimeout(timer);
-      }
+      const url = GAS_URL + '?action=status&name=' + encodeURIComponent(name);
+      const res = await fetch(url, { method: 'GET', redirect: 'follow' });
+      const text = await res.text();
       const data = JSON.parse(text);
       if (myRequestId !== statusRequestId) return; // มีการเปลี่ยนพนักงานไปแล้ว ทิ้งผลลัพธ์อันนี้
-      // บั๊ค (แก้แล้ว): เดิมยัดค่าที่ได้ลง todayStatus ตรงๆ โดยไม่ตรวจรูปร่างเลย
-      // ถ้าเซิร์ฟเวอร์คืน array / สตริง / object ที่ไม่มีสองฟิลด์นี้ (เช่นตอน error)
-      // todayStatus จะกลายเป็นค่าที่ updateSubmitButton อ่านแล้วตีความผิด
-      todayStatus = {
-        checkin:  !!(data && data.checkin),
-        checkout: !!(data && data.checkout)
-      };
-      statusFetchedForDate = todayKey();
+      todayStatus = data;
     } catch (err) {
       if (myRequestId !== statusRequestId) return;
       console.warn('checkEmployeeStatus error:', err);
       // ถ้าเช็คไม่ได้ ให้ผ่านไปก่อน
       todayStatus = { checkin: false, checkout: false };
-      statusFetchedForDate = '';
     }
     if (myRequestId !== statusRequestId) return; // กันอัปเดต UI ผิดคนด้วย
 
@@ -2001,15 +1920,6 @@
     if (!name) {
       lock(currentType === 'in' ? '— เลือกชื่อพนักงาน —' : '— เลือกชื่อพนักงาน —');
       return;
-    }
-
-    // บั๊ค (แก้แล้ว): กันข้อมูลข้ามวัน — ถ้าสถานะที่ถืออยู่เป็นของวันก่อนหน้า
-    // (หน้าเว็บถูกเปิดค้างข้ามคืน) ห้ามใช้ตัดสินใจล็อกปุ่ม ให้ไปดึงใหม่ก่อน
-    if (statusFetchedForDate && statusFetchedForDate !== todayKey()) {
-      todayStatus = { checkin: false, checkout: false };
-      statusFetchedForDate = '';
-      clearTimeout(statusCheckTimeout);
-      statusCheckTimeout = setTimeout(() => checkEmployeeStatus(name), 0);
     }
 
     // ── มีรูป + มีชื่อ: ตรวจสถานะวันนี้ ─────────────────────────
@@ -2077,25 +1987,14 @@
     try {
       const payload = JSON.stringify({ name, type: typeLabel, image: imageData });
       const __clientT0 = performance.now();
-      // บั๊ค (แก้แล้ว): เดิม fetch นี้ไม่มี timeout เลย ถ้า Apps Script ค้าง (โควต้าเต็ม/
-      // execution ชนเพดาน 6 นาที/เน็ตออฟฟิศหลุดกลางคัน) คำขอจะค้างไม่มีกำหนด
-      // ปุ่มถูก disable ไว้แล้วตั้งแต่ต้นฟังก์ชัน จึงกลายเป็น "ปุ่มบันทึกค้างหมุนตลอดไป"
-      // พนักงานคนถัดไปใช้เครื่องต่อไม่ได้เลยจนกว่าจะรีโหลดหน้า
-      const __ctrl = new AbortController();
-      const __timer = setTimeout(() => __ctrl.abort(), 45000);
-      let text;
-      try {
-        const res = await fetch(GAS_URL, {
-          method: 'POST',
-          body: payload,
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          redirect: 'follow',
-          signal: __ctrl.signal
-        });
-        text = await res.text();
-      } finally {
-        clearTimeout(__timer);
-      }
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        body: payload,
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        redirect: 'follow'
+      });
+
+      const text = await res.text();
       const __clientTotalMs = Math.round(performance.now() - __clientT0);
       const __srvMatch = text.match(/srvms=(\d+)/);
       const __srvMs = __srvMatch ? parseInt(__srvMatch[1], 10) : null;
@@ -2143,10 +2042,7 @@
       }
     } catch (err) {
       console.error('Submit error:', err);
-      const msg = err && err.name === 'AbortError'
-        ? 'หมดเวลารอเซิร์ฟเวอร์ กรุณาลองใหม่'
-        : (err.message || 'เกิดข้อผิดพลาด');
-      showToast('❌ ' + String(msg).slice(0, 60), 'error');
+      showToast('❌ ' + (err.message || 'เกิดข้อผิดพลาด').slice(0, 60), 'error');
       addHistory(name, typeLabel, 'error', '');
     } finally {
       submitBtn.disabled = false;
@@ -2211,42 +2107,19 @@
 
     // ── แสดง popup ────────────────────────────────────────────
     const popup = document.getElementById('success-popup');
-
-    // บั๊ค (แก้แล้ว): เดิม closeSuccessPopup() ตั้ง setTimeout 300ms ไว้ล้างคลาส/ตั้ง
-    // opacity = 0 แล้วไม่เคยยกเลิกไทเมอร์ตัวนั้นเลย ถ้ามีการบันทึกสำเร็จอีกครั้งภายใน
-    // 300ms หลังปิด (เช่น กด "ตกลง" แล้วพนักงานคนถัดไปกดบันทึกทันที) ไทเมอร์เก่าจะมา
-    // ถอดคลาส .show และตั้ง opacity = 0 ให้ป็อปอัพ "ตัวใหม่" = ป็อปอัพหายไปทั้งที่บันทึก
-    // สำเร็จแล้ว ผู้ใช้ไม่เห็นคำยืนยันอะไรเลย
-    clearTimeout(popupHideTimer);
-    popupHideTimer = null;
-
     popup.style.opacity = '';
-    // ต้องถอดคลาสก่อนแล้วค่อยใส่ใหม่ ไม่งั้น browser ถือว่า animation เดิมยังทำงานอยู่
-    // แล้วจะไม่เล่นซ้ำ (ป็อปอัพตัวที่สองจะโผล่มาเฉยๆ ไม่มี animation)
-    popup.className = '';
-    void popup.offsetWidth; // บังคับ reflow เพื่อรีสตาร์ท animation
     popup.className = 'show';
 
     // ปิดอัตโนมัติหลัง 5 วินาที
-    clearTimeout(popupAutoCloseTimer);
-    popupAutoCloseTimer = setTimeout(closeSuccessPopup, 5000);
+    clearTimeout(window._popupTimer);
+    window._popupTimer = setTimeout(closeSuccessPopup, 5000);
   }
 
-  let popupAutoCloseTimer = null;
-  let popupHideTimer = null;
-
   function closeSuccessPopup() {
-    clearTimeout(popupAutoCloseTimer);
-    popupAutoCloseTimer = null;
+    clearTimeout(window._popupTimer);
     const popup = document.getElementById('success-popup');
-    if (!popup.classList.contains('show')) return; // ปิดอยู่แล้ว ไม่ต้องทำอะไร
     popup.className = 'hide';
-    clearTimeout(popupHideTimer);
-    popupHideTimer = setTimeout(() => {
-      popup.className = '';
-      popup.style.opacity = '0';
-      popupHideTimer = null;
-    }, 300);
+    setTimeout(() => { popup.className = ''; popup.style.opacity = '0'; }, 300);
   }
 
   function spawnParticles(isIn) {
@@ -2292,15 +2165,7 @@
   function loadEmployees() {
     const saved = localStorage.getItem('employees');
     if (saved) {
-      try {
-        const list = JSON.parse(saved);
-        // ปรับปรุง: เดิมคืนค่าที่ parse ได้ทันทีโดยไม่ตรวจว่าเป็น array ของสตริงจริงไหม
-        // ถ้าค่าใน localStorage เพี้ยน (เช่นเป็น object) renderDropdown จะพังทั้งหน้า
-        if (Array.isArray(list)) {
-          const clean = list.filter(n => typeof n === 'string' && n.trim());
-          if (clean.length) return clean;
-        }
-      } catch(e) {}
+      try { return JSON.parse(saved); } catch(e) {}
     }
     return [...DEFAULT_EMPLOYEES];
   }
@@ -2380,12 +2245,8 @@
 
   function onEmployeeChange() {
     todayStatus = { checkin: false, checkout: false };
-    statusFetchedForDate = '';
     updateSubmitButton();
     const name = document.getElementById('name-input').value.trim();
-    // ปรับปรุง: จำชื่อที่เลือกไว้ทันที เดิมจำเฉพาะตอนบันทึกสำเร็จเท่านั้น
-    // พนักงานที่เลือกชื่อแล้วรีโหลดหน้า (หรือกล้องล้มแล้วต้องโหลดใหม่) ต้องมาเลือกชื่อใหม่ทุกครั้ง
-    if (name) localStorage.setItem('saved_name', name);
     if (name) {
       clearTimeout(statusCheckTimeout);
       statusCheckTimeout = setTimeout(() => checkEmployeeStatus(name), 400);
@@ -2403,64 +2264,39 @@
       time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       date: new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })
     };
-    checkinHistory.unshift(item);
-    if (checkinHistory.length > 20) checkinHistory.pop();
-    try {
-      localStorage.setItem('checkin_history', JSON.stringify(checkinHistory));
-    } catch (e) {
-      // localStorage เต็ม/ถูกปิด (โหมดส่วนตัวบางเบราว์เซอร์) — ประวัติเป็นแค่ของอำนวยความสะดวก
-      // ห้ามให้ล้มทั้งฟังก์ชันจนกระทบการแสดงผลหลังบันทึกสำเร็จ
-      console.warn('บันทึกประวัติลง localStorage ไม่สำเร็จ:', e);
-    }
+    history.unshift(item);
+    if (history.length > 20) history.pop();
+    localStorage.setItem('checkin_history', JSON.stringify(history));
     renderHistory();
-  }
-
-  // ปรับปรุงความปลอดภัย: อนุญาตเฉพาะลิงก์ http/https เท่านั้น
-  // บั๊ค (แก้แล้ว): เดิมเอา item.driveLink ที่ได้จาก Apps Script ไปแปะใน href="..." ตรงๆ
-  // โดยไม่ escape ถ้าค่านั้นมี " ปนมา (เช่นเซิร์ฟเวอร์คืนข้อความ error แทน URL) จะหลุด
-  // ออกนอก attribute แล้วแทรก HTML/สคริปต์ลงหน้าเว็บได้ และค่าอย่าง javascript:... ก็ทำงานได้จริง
-  function safeUrl(u) {
-    const str = (u == null ? '' : String(u)).trim();
-    if (!str) return '';
-    return /^https?:\/\//i.test(str) ? str : '';
   }
 
   function renderHistory() {
     const list = document.getElementById('history-list');
-    if (!checkinHistory.length) {
+    if (!history.length) {
       list.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:13px;padding:16px 0">ยังไม่มีประวัติ</div>';
       return;
     }
-    list.innerHTML = checkinHistory.map(item => {
-      const link = safeUrl(item.driveLink);
-      return `
+    list.innerHTML = history.map(item => `
       <div class="history-item">
-        <span class="history-badge ${item.type === 'เข้างาน' ? 'badge-in' : 'badge-out'}">${escapeHTML(item.type)}</span>
+        <span class="history-badge ${item.type === 'เข้างาน' ? 'badge-in' : 'badge-out'}">${item.type}</span>
         <div class="history-info">
           <div class="history-name">${escapeHTML(item.name)}</div>
-          <div class="history-time">${escapeHTML(item.date)} · ${escapeHTML(item.time)}</div>
-          ${link ? `<a href="${escapeHTML(link)}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:var(--accent-blue);text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px">🔗 ดูรูปภาพ</a>` : ''}
+          <div class="history-time">${item.date} · ${item.time}</div>
+          ${item.driveLink ? `<a href="${item.driveLink}" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent-blue);text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px">🔗 ดูรูปภาพ</a>` : ''}
         </div>
         <span class="history-status ${item.status === 'error' ? 'err' : ''}">${item.status === 'success' ? '✓ สำเร็จ' : '✗ ผิดพลาด'}</span>
-      </div>`;
-    }).join('');
+      </div>
+    `).join('');
   }
 
   function clearHistory() {
-    // ปรับปรุง: เดิมกดปุ่ม "ลบทั้งหมด" แล้วหายทันทีโดยไม่ถาม (ปุ่มอยู่ติดกับรายการพอดี
-    // กดพลาดบนมือถือได้ง่ายมาก) — ให้ยืนยันก่อนเหมือนตอนลบรายชื่อพนักงาน
-    if (checkinHistory.length && !confirm('ลบประวัติทั้งหมดออกจากเครื่องนี้?')) return;
-    checkinHistory = [];
+    history = [];
     localStorage.removeItem('checkin_history');
     renderHistory();
   }
 
-  // บั๊ค (แก้แล้ว): เดิมเรียก str.replace() ตรงๆ ถ้า str เป็น undefined/null/ตัวเลข
-  // (เช่นรายการประวัติเก่าที่โครงสร้างไม่ครบ หรือค่าที่อ่านกลับมาจาก localStorage ที่ถูกแก้)
-  // จะโยน TypeError กลางการ render ทำให้ประวัติทั้งกล่องหายไปเฉยๆ
   function escapeHTML(str) {
-    return String(str == null ? '' : str)
-      .replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   }
 
   // ============================================================
@@ -2470,13 +2306,8 @@
   function showToast(msg, type = 'success') {
     const toast = document.getElementById('toast');
     const toastMsg = document.getElementById('toast-msg');
-    const toastIcon = document.getElementById('toast-icon');
     clearTimeout(toastTimer);
     toastMsg.textContent = msg;
-    // บั๊ค (แก้แล้ว): เดิมไม่เคยแตะ #toast-icon เลย ไอคอนจึงเป็น ✓ (เครื่องหมายถูกสีเขียว)
-    // ค้างไว้ตั้งแต่ HTML ทุกกรณี รวมถึงตอนแจ้ง error — ผู้ใช้เห็นเป็น "✓ ⚠️ ไม่พบใบหน้า"
-    // ซึ่งอ่านแล้วขัดกันเอง และเสี่ยงให้เข้าใจผิดว่าบันทึกสำเร็จ
-    if (toastIcon) toastIcon.textContent = type === 'error' ? '⚠️' : type === 'info' ? 'ℹ️' : '✓';
     toast.className = 'show ' + (type === 'error' ? 'error' : type === 'success' ? 'success' : '');
     toastTimer = setTimeout(() => { toast.className = ''; }, 3000);
   }
@@ -2487,12 +2318,9 @@
   // INIT
   // ============================================================
   window.addEventListener('load', async () => {
-    // ปรับปรุง: หุ้ม try/catch ทีละขั้น — เดิมถ้า startCamera()/enumerateDevices() โยน
-    // exception (เช่น navigator.mediaDevices ไม่มีเพราะเปิดผ่าน http:// ที่ไม่ใช่ localhost)
-    // ลำดับ init ทั้งก้อนจะหยุดกลางทาง: รายชื่อพนักงานไม่ถูกเรนเดอร์ ประวัติไม่ขึ้น
-    // ปุ่มไม่ถูกตั้งค่า = หน้าเว็บดูเหมือนพังทั้งหน้าทั้งที่ปัญหาคือแค่กล้อง
-    try { await startCamera(); } catch (e) { console.warn('startCamera:', e); }
-    try { await enumerateDevices(); } catch (e) { console.warn('enumerateDevices:', e); }
+    // First get permission, then enumerate devices for accurate labels
+    await startCamera();
+    await enumerateDevices();
     loadFaceApi();  // โหลด AI model (background)
     renderHistory();
 
